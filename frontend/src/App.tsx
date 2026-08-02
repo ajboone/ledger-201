@@ -1,15 +1,12 @@
 import "./App.css";
-import Button from "./Button";
+import Chatbot from "./Chatbot";
 import Sidebar from "./Sidebar";
-import TextInput from "./TextInput";
 
 const App = () => {
   return (
     <>
-      <button></button>
       <Sidebar />
-      <TextInput />
-      <Button label="Click me" />
+      <Chatbot />
     </>
   );
 };
