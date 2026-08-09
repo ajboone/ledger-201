@@ -4,10 +4,10 @@ import Sidebar from "./Sidebar";
 
 const App = () => {
   return (
-    <>
+    <div className="app">
       <Sidebar />
       <Chatbot />
-    </>
+    </div>
   );
 };
 

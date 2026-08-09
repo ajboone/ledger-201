@@ -9,6 +9,13 @@
   padding: 0;
 }
 
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
 body {
   font-family: "Inter", serif;
   font-optical-sizing: auto;

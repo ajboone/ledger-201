@@ -4,10 +4,12 @@ export const textInputWrapperStyles: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   padding: "2rem",
+  marginTop: "9rem",
   borderRadius: "2rem",
   width: "75%",
   border: "15px solid rgba(6, 224, 86, 0.2)",
   boxShadow: "0 0 24px rgba(6, 224, 86, 0.18)",
+  backgroundColor: "#fff",
 };
 
 export const textAreaStyles: CSSProperties = {
