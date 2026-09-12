@@ -1,2 +1,29 @@
 :root {
+  --lightgray: #f3f3f3;
+  --green: #06e056;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Inter", serif;
+  font-optical-sizing: auto;
+  font-weight: 200;
+  font-style: normal;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
