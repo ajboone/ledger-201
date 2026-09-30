@@ -1,22 +1,11 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { createVendor, getVendors } from "../api/vendors";
+import type { Vendor as VendorData } from "../types/vendor";
 import "./Vendor.css";
 
-interface Vendor {
-  id: number;
-  name: string;
-  created_at: string;
-}
-
-interface ApiErrorResponse {
-  detail?: string;
-}
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-
 const Vendor = () => {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<VendorData[]>([]);
   const [vendorName, setVendorName] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -29,15 +18,7 @@ const Vendor = () => {
   useEffect(() => {
     async function loadVendors() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/vendors`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Vendor request failed with status ${response.status}.`,
-          );
-        }
-
-        const vendorData = (await response.json()) as Vendor[];
+        const vendorData = await getVendors();
 
         setVendors(vendorData);
       } catch (error) {
@@ -70,26 +51,7 @@ const Vendor = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/vendors`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: normalizedName,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = (await response.json()) as ApiErrorResponse;
-
-        throw new Error(
-          errorData.detail ??
-            `Vendor request failed with status ${response.status}.`,
-        );
-      }
-
-      const createdVendor = (await response.json()) as Vendor;
+      const createdVendor = await createVendor(normalizedName);
 
       setVendors((currentVendors) =>
         [...currentVendors, createdVendor].sort((first, second) =>

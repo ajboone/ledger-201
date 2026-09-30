@@ -1,0 +1,66 @@
+.location {
+  width: min(720px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 4rem 0;
+}
+
+.location header { margin-bottom: 3rem; }
+.location h1 { margin: 0; font-size: clamp(2.5rem, 7vw, 4.5rem); }
+.location h2 { margin-top: 0; }
+.location .eyebrow {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.location .description { max-width: 540px; }
+
+.location-section {
+  padding: 1.5rem;
+  border: 1px solid #d7d7d7;
+  border-radius: 12px;
+}
+
+.location-form { margin-bottom: 2rem; }
+.location-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+.location-form input {
+  display: block;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  font: inherit;
+  border: 1px solid #b8b8b8;
+  border-radius: 8px;
+}
+.location-form button {
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+.location-form button:disabled { cursor: not-allowed; opacity: 0.6; }
+.location .form-message { margin-bottom: 0; margin-top: 0.75rem; }
+.location .error-message, .location .success-message { font-weight: 600; overflow-wrap: anywhere; }
+
+.location-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.location-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.location-list span { opacity: 0.7; }

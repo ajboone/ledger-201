@@ -10,6 +10,7 @@ export const Navbar = () => {
   const navItems = [
     { label: "Chatbot", href: "/" },
     { label: "Vendor", href: "/vendor" },
+    { label: "Locations", href: "/location" },
   ];
 
   return (
