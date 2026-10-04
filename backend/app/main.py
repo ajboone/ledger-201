@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import models
 from app.database import Base, engine
-from app.routers import locations, orders, payments, refunds, vendors
+from app.routers import daily_review, locations, orders, payments, refunds, vendors
 
 
 Base.metadata.create_all(bind=engine)
@@ -35,6 +35,7 @@ app.include_router(locations.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(refunds.router)
+app.include_router(daily_review.router)
 
 
 @app.get("/")

@@ -11,6 +11,7 @@ export const Navbar = () => {
     { label: "Chatbot", href: "/" },
     { label: "Vendor", href: "/vendor" },
     { label: "Locations", href: "/location" },
+    { label: "Daily Review", href: "/daily-review" },
   ];
 
   return (

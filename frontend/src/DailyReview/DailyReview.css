@@ -1,0 +1,231 @@
+.daily-review {
+  width: min(1440px, calc(100% - 3rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+  color: #17211b;
+}
+
+.daily-review-header,
+.daily-review-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.daily-review-header {
+  margin-bottom: 2rem;
+}
+
+.daily-review h1 {
+  margin: 0.15rem 0 0.5rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.daily-review h2 {
+  margin-top: 0.2rem;
+  font-size: 1.4rem;
+}
+
+.daily-review-header > div:first-child > p:last-child,
+.daily-review-muted {
+  color: #66736a;
+}
+
+.daily-review-eyebrow {
+  color: #53705d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.daily-review-filters {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.daily-review-filters label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 180px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.daily-review-filters select,
+.daily-review-filters input {
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  border: 1px solid #cbd5ce;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.daily-review-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.daily-review-card,
+.daily-review-panel {
+  border: 1px solid #e0e7e1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgb(30 54 38 / 4%);
+}
+
+.daily-review-card {
+  min-height: 112px;
+  padding: 1.1rem;
+}
+
+.daily-review-card p {
+  margin-bottom: 0.8rem;
+  color: #66736a;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.daily-review-card strong {
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.daily-review-panel {
+  margin-top: 1rem;
+  padding: 1.25rem;
+}
+
+.daily-review-section-heading {
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.daily-review-section-heading h2 {
+  margin-bottom: 0;
+}
+
+.review-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.review-status.is-reconciled {
+  color: #176a3a;
+  background: #e5f5ea;
+}
+
+.review-status.needs-review {
+  color: #8a3b12;
+  background: #fff0df;
+}
+
+.daily-review-difference {
+  margin: 0 0 1rem;
+  color: #58655c;
+}
+
+.daily-review-table-wrap {
+  overflow-x: auto;
+}
+
+.daily-review table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.daily-review th,
+.daily-review td {
+  padding: 0.8rem 0.7rem;
+  border-bottom: 1px solid #edf0ed;
+  white-space: nowrap;
+}
+
+.daily-review th {
+  color: #66736a;
+  font-size: 0.77rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.daily-review td {
+  font-size: 0.9rem;
+}
+
+.daily-review tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.daily-review tbody tr.review-row {
+  background: #fffaf4;
+}
+
+.daily-review-empty {
+  padding: 1rem 0;
+  color: #66736a;
+}
+
+.daily-review-error {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e8b9a9;
+  border-radius: 10px;
+  color: #8a2f17;
+  background: #fff4ef;
+}
+
+@media (max-width: 900px) {
+  .daily-review-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .daily-review-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .daily-review {
+    width: min(100% - 1.5rem, 1440px);
+    padding-top: 1.25rem;
+  }
+
+  .daily-review-filters {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .daily-review-filters label {
+    width: 100%;
+  }
+
+  .daily-review-metrics {
+    gap: 0.6rem;
+  }
+
+  .daily-review-card {
+    min-height: 100px;
+    padding: 0.85rem;
+  }
+
+  .daily-review-card strong {
+    font-size: 1.2rem;
+  }
+
+  .daily-review-panel {
+    padding: 1rem 0.75rem;
+  }
+}

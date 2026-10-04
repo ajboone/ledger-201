@@ -7,6 +7,7 @@ import "./index.css";
 import Navbar from "./Navbar";
 import Vendor from "./Vendor";
 import Location from "./Location";
+import DailyReview from "./DailyReview/DailyReview";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<App />} />
         <Route path="vendor" element={<Vendor />} />
         <Route path="location" element={<Location />} />
+        <Route path="daily-review" element={<DailyReview />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

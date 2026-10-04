@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -371,3 +371,48 @@ class RefundRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     payment: PaymentSummaryRead
+
+
+class OrderReconciliation(BaseModel):
+    """Order-level payment reconciliation included in a daily review."""
+
+    order_id: int
+    square_order_id: str | None
+    order_total_amount: int
+    completed_payment_amount: int
+    completed_refund_amount: int
+    net_collected_amount: int
+    difference: int
+    status: str
+
+
+class ItemSummary(BaseModel):
+    """Sales summary for one menu item on the review date."""
+
+    item_name: str
+    quantity_sold: int
+    gross_sales_amount: int
+    total_sales_amount: int
+
+
+class DailyReview(BaseModel):
+    """Calculated financial and item summary for a location and local date."""
+
+    location_id: int
+    location_name: str
+    currency: str
+    review_date: date
+    order_count: int
+    subtotal_amount: int
+    discount_amount: int
+    tax_amount: int
+    service_charge_amount: int
+    order_total_amount: int
+    completed_payment_amount: int
+    completed_refund_amount: int
+    net_collected_amount: int
+    average_order_value: int
+    reconciliation_difference: int
+    reconciliation_status: str
+    orders: list[OrderReconciliation]
+    top_items: list[ItemSummary]

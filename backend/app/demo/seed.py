@@ -41,14 +41,13 @@ def _demo_orders(location_id: int) -> tuple[schemas.OrderCreate, ...]:
             currency="USD",
             created_at=datetime.fromisoformat("2026-09-12T18:15:00-04:00"),
             closed_at=datetime.fromisoformat("2026-09-12T18:42:00-04:00"),
-            subtotal_amount=4600,
-            discount_amount=200,
-            tax_amount=352,
-            total_amount=4752,
+            subtotal_amount=1597,
+            tax_amount=128,
+            total_amount=1725,
             line_items=[
-                _line_item("Spicy Tuna Roll", 2, 1400, "Sushi Rolls"),
-                _line_item("Edamame", 1, 800, "Appetizers"),
-                _line_item("Soft Drink", 2, 500, "Beverages"),
+                _line_item("California", 1, 699, "Sushi Rolls"),
+                _line_item("Miso Soup", 1, 299, "Salads & Soups"),
+                _line_item("Edamame", 1, 599, "Appetizers"),
             ],
         ),
         schemas.OrderCreate(
@@ -58,15 +57,16 @@ def _demo_orders(location_id: int) -> tuple[schemas.OrderCreate, ...]:
             currency="USD",
             created_at=datetime.fromisoformat("2026-09-13T19:05:00-04:00"),
             closed_at=datetime.fromisoformat("2026-09-13T19:38:00-04:00"),
-            subtotal_amount=6700,
-            tax_amount=536,
-            total_amount=7236,
+            subtotal_amount=4294,
+            discount_amount=300,
+            tax_amount=320,
+            total_amount=4314,
             line_items=[
-                _line_item("Shrimp Tempura", 1, 1800, "Entrees"),
-                _line_item("California Roll", 2, 1200, "Sushi Rolls"),
-                _line_item("Salmon Nigiri", 4, 350, "Nigiri"),
-                _line_item("Miso Soup", 1, 600, "Appetizers"),
-                _line_item("Soft Drink", 1, 500, "Beverages"),
+                _line_item("California", 2, 699, "Sushi Rolls"),
+                _line_item("Spicy Tuna Roll", 1, 899, "Sushi Rolls"),
+                _line_item("Dragon Roll", 1, 999, "Sushi Rolls"),
+                _line_item("Pork Gyoza 6pc", 1, 699, "Appetizers"),
+                _line_item("House Salad", 1, 299, "Salads & Soups"),
             ],
         ),
         schemas.OrderCreate(
@@ -76,15 +76,15 @@ def _demo_orders(location_id: int) -> tuple[schemas.OrderCreate, ...]:
             currency="USD",
             created_at=datetime.fromisoformat("2026-09-14T20:10:00-04:00"),
             closed_at=datetime.fromisoformat("2026-09-14T20:51:00-04:00"),
-            subtotal_amount=5800,
+            subtotal_amount=5496,
             discount_amount=500,
-            tax_amount=424,
-            total_amount=5724,
+            tax_amount=400,
+            total_amount=5396,
             line_items=[
-                _line_item("Sashimi Combo", 1, 3200, "Sashimi"),
-                _line_item("Spicy Tuna Roll", 1, 1400, "Sushi Rolls"),
-                _line_item("Miso Soup", 1, 600, "Appetizers"),
-                _line_item("Edamame", 1, 600, "Appetizers"),
+                _line_item("Sashimi Meal", 1, 3399, "Sushi Entrées"),
+                _line_item("Spicy Tuna Roll", 1, 899, "Sushi Rolls"),
+                _line_item("Edamame", 1, 599, "Appetizers"),
+                _line_item("Fried Cheesecake", 1, 599, "Desserts"),
             ],
         ),
         schemas.OrderCreate(
@@ -94,14 +94,19 @@ def _demo_orders(location_id: int) -> tuple[schemas.OrderCreate, ...]:
             currency="USD",
             created_at=datetime.fromisoformat("2026-09-16T17:50:00-04:00"),
             closed_at=datetime.fromisoformat("2026-09-16T18:22:00-04:00"),
-            subtotal_amount=3900,
-            tax_amount=312,
-            total_amount=4212,
+            subtotal_amount=6496,
+            tax_amount=520,
+            total_amount=7016,
             line_items=[
-                _line_item("Shrimp Tempura", 1, 1800, "Entrees"),
-                _line_item("Salmon Nigiri", 2, 350, "Nigiri"),
-                _line_item("Miso Soup", 1, 600, "Appetizers"),
-                _line_item("Edamame", 1, 800, "Appetizers"),
+                _line_item("Hibachi Steak", 1, 2099, "Hibachi Entrées"),
+                _line_item("Hibachi Shrimp", 1, 1599, "Hibachi Entrées"),
+                _line_item("Teriyaki Chicken", 1, 1499, "Hibachi Entrées"),
+                _line_item(
+                    "Shrimp & Vegetable Tempura",
+                    1,
+                    1299,
+                    "Appetizers",
+                ),
             ],
         ),
     )
@@ -135,20 +140,66 @@ def seed_demo_data(db: Session) -> tuple[int, int]:
     inserted_orders = 0
     skipped_orders = 0
     for order_data in _demo_orders(location.id):
-        existing_order = db.scalar(
+        order = db.scalar(
             select(models.Order).where(
                 models.Order.square_order_id == order_data.square_order_id
             )
         )
-        if existing_order is not None:
-            skipped_orders += 1
+        if order is None:
+            create_order(db, order_data)
+            inserted_orders += 1
             continue
 
-        create_order(db, order_data)
-        inserted_orders += 1
+        _refresh_demo_order(db, order, order_data)
+        skipped_orders += 1
 
     _seed_demo_payments_and_refunds(db)
     return inserted_orders, skipped_orders
+
+
+def _refresh_demo_order(
+    db: Session,
+    order: models.Order,
+    order_data: schemas.OrderCreate,
+) -> None:
+    """Refresh only the known demo order and its existing seeded line items."""
+
+    existing_line_items = list(
+        db.scalars(
+            select(models.OrderLineItem)
+            .where(models.OrderLineItem.order_id == order.id)
+            .order_by(models.OrderLineItem.id)
+        ).all()
+    )
+    if len(existing_line_items) != len(order_data.line_items):
+        raise RuntimeError(
+            f"Demo order {order.square_order_id} has a different line-item count "
+            "than its deterministic fixture; refusing to delete or reset records."
+        )
+
+    order.state = order_data.state
+    order.currency = order_data.currency
+    order.created_at = order_data.created_at
+    order.closed_at = order_data.closed_at
+    order.subtotal_amount = order_data.subtotal_amount
+    order.discount_amount = order_data.discount_amount
+    order.tax_amount = order_data.tax_amount
+    order.service_charge_amount = order_data.service_charge_amount
+    order.total_amount = order_data.total_amount
+
+    for existing, fixture in zip(existing_line_items, order_data.line_items):
+        existing.square_line_item_id = fixture.square_line_item_id
+        existing.catalog_object_id = fixture.catalog_object_id
+        existing.item_name = fixture.item_name
+        existing.variation_name = fixture.variation_name
+        existing.category_name = fixture.category_name
+        existing.quantity = fixture.quantity
+        existing.unit_price_amount = fixture.unit_price_amount
+        existing.gross_sales_amount = fixture.gross_sales_amount
+        existing.discount_amount = fixture.discount_amount
+        existing.total_amount = fixture.total_amount
+
+    db.commit()
 
 
 def _seed_demo_payments_and_refunds(db: Session) -> None:
@@ -160,7 +211,7 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
             "LEDGER201-DEMO-ORDER-001",
             "COMPLETED",
             "CARD",
-            4752,
+            1725,
             "2026-09-12T18:42:00-04:00",
         ),
         (
@@ -168,7 +219,7 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
             "LEDGER201-DEMO-ORDER-002",
             "COMPLETED",
             "CASH",
-            7236,
+            4314,
             "2026-09-13T19:38:00-04:00",
         ),
         (
@@ -176,7 +227,7 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
             "LEDGER201-DEMO-ORDER-003",
             "COMPLETED",
             "CARD",
-            5724,
+            5396,
             "2026-09-14T20:51:00-04:00",
         ),
         (
@@ -184,7 +235,7 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
             "LEDGER201-DEMO-ORDER-004",
             "COMPLETED",
             "CARD",
-            4212,
+            7016,
             "2026-09-16T18:22:00-04:00",
         ),
         (
@@ -198,14 +249,11 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
     )
 
     for payment_id, order_square_id, payment_status, source_type, amount, created_at in payment_examples:
-        existing_payment = db.scalar(
+        payment = db.scalar(
             select(models.Payment).where(
                 models.Payment.square_payment_id == payment_id
             )
         )
-        if existing_payment is not None:
-            continue
-
         order = db.scalar(
             select(models.Order).where(
                 models.Order.square_order_id == order_square_id
@@ -215,6 +263,14 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
             raise RuntimeError(
                 f"Demo order {order_square_id} was not found while seeding payments."
             )
+        if payment is not None:
+            if payment.order_id != order.id:
+                raise RuntimeError(
+                    f"Demo payment {payment_id} is associated with an unexpected order."
+                )
+            payment.amount = amount
+            payment.currency = order.currency
+            continue
 
         create_payment(
             db,
@@ -228,6 +284,8 @@ def _seed_demo_payments_and_refunds(db: Session) -> None:
                 created_at=datetime.fromisoformat(created_at),
             ),
         )
+
+    db.commit()
 
     payment = db.scalar(
         select(models.Payment).where(

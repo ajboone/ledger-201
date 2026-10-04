@@ -367,6 +367,98 @@ def test_demo_seed_is_idempotent(db_session: Session) -> None:
     assert counts_after_first_seed == counts_after_second_seed
 
 
+def test_demo_seed_menu_totals_reconcile_and_existing_seed_refreshes(
+    db_session: Session,
+) -> None:
+    seed_demo_data(db_session)
+    order = db_session.scalar(
+        select(models.Order).where(
+            models.Order.square_order_id == "LEDGER201-DEMO-ORDER-001"
+        )
+    )
+    payment = db_session.scalar(
+        select(models.Payment).where(
+            models.Payment.square_payment_id == "LEDGER201-DEMO-PAYMENT-001"
+        )
+    )
+    assert order is not None
+    assert payment is not None
+
+    first_item = db_session.scalar(
+        select(models.OrderLineItem)
+        .where(models.OrderLineItem.order_id == order.id)
+        .order_by(models.OrderLineItem.id)
+    )
+    assert first_item is not None
+    first_item.item_name = "Old placeholder item"
+    payment.amount = 1
+    db_session.commit()
+
+    seed_demo_data(db_session)
+    demo_orders = list(
+        db_session.scalars(
+            select(models.Order)
+            .where(models.Order.square_order_id.like("LEDGER201-DEMO-ORDER-%"))
+            .order_by(models.Order.square_order_id)
+        ).all()
+    )
+    expected_totals = {
+        "LEDGER201-DEMO-ORDER-001": (1597, 0, 128, 1725),
+        "LEDGER201-DEMO-ORDER-002": (4294, 300, 320, 4314),
+        "LEDGER201-DEMO-ORDER-003": (5496, 500, 400, 5396),
+        "LEDGER201-DEMO-ORDER-004": (6496, 0, 520, 7016),
+    }
+
+    assert len(demo_orders) == 4
+    for demo_order in demo_orders:
+        expected_subtotal, expected_discount, expected_tax, expected_total = (
+            expected_totals[demo_order.square_order_id]
+        )
+        line_items = list(
+            db_session.scalars(
+                select(models.OrderLineItem)
+                .where(models.OrderLineItem.order_id == demo_order.id)
+                .order_by(models.OrderLineItem.id)
+            ).all()
+        )
+        assert sum(item.gross_sales_amount for item in line_items) == expected_subtotal
+        assert demo_order.subtotal_amount == expected_subtotal
+        assert demo_order.discount_amount == expected_discount
+        assert demo_order.tax_amount == expected_tax
+        assert demo_order.total_amount == expected_total
+        assert (
+            demo_order.subtotal_amount
+            - demo_order.discount_amount
+            + demo_order.tax_amount
+            + demo_order.service_charge_amount
+            == demo_order.total_amount
+        )
+        completed_payment = db_session.scalar(
+            select(models.Payment).where(
+                models.Payment.order_id == demo_order.id,
+                models.Payment.status == "COMPLETED",
+            )
+        )
+        assert completed_payment is not None
+        assert completed_payment.amount == demo_order.total_amount
+
+    db_session.refresh(order)
+    db_session.refresh(payment)
+    first_order_items = list(
+        db_session.scalars(
+            select(models.OrderLineItem)
+            .where(models.OrderLineItem.order_id == order.id)
+            .order_by(models.OrderLineItem.id)
+        ).all()
+    )
+    assert [item.item_name for item in first_order_items] == [
+        "California",
+        "Miso Soup",
+        "Edamame",
+    ]
+    assert payment.amount == order.total_amount
+
+
 def test_order_and_line_items_rollback_together_on_child_failure(
     db_session: Session,
 ) -> None:

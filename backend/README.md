@@ -135,6 +135,27 @@ Payment listing supports `?order_id=<id>` and refund listing supports
 `?payment_id=<id>`. Refund responses include a compact payment summary without
 nested orders or refund collections.
 
+## Daily Review
+
+`GET /api/daily-review?location_id=<id>&date=YYYY-MM-DD` returns daily sales,
+discounts, taxes, service charges, completed payment/refund totals, net
+collected amount, average order value, per-order reconciliation, and ranked
+item sales for the selected location and date.
+
+Orders are grouped by their `created_at` local calendar date. Because SQLite
+drops timezone offsets in the current timestamp columns, stored naive
+timestamps are temporarily treated as location-local wall time. Payments and
+refunds are included with their related Orders regardless of their own
+creation dates. Reconciliation is completed payments minus completed refunds
+minus order total; only `COMPLETED` payments and refunds count. The daily
+status is `REVIEW_REQUIRED` if its difference is nonzero or any individual
+Order is mismatched. Item sales use line-item `total_amount` after line
+discounts and rank by quantity, then net item sales, then item name. The
+review rejects Orders, Payments, or Refunds whose currency differs from the
+currency of their parent record rather than combining incomparable amounts.
+Average order value is order total divided by order count, rounded to the
+nearest minor unit.
+
 ## Load Sushi 201 demo orders
 
 From the `backend` directory, run:
@@ -144,18 +165,26 @@ python -m app.demo.seed
 ```
 
 This opt-in command creates or reuses the Sushi 201 location and inserts four
-dated demo orders with realistic line items, five payments, and three refunds.
-The demo includes completed and failed payments plus completed, pending, and
-failed refunds. Stable Square-style IDs prevent duplicate records on reruns;
-existing records are reused, and the command does not delete or reset
-developer data. To target a separate SQLite database, pass
+dated demo orders using fixed-price items and prices from the
+[Sushi 201 Summerville menu](https://sushi201summerville.com/menu/18669103),
+plus five payments and three refunds. The demo includes completed and failed
+payments plus completed, pending, and failed refunds. Stable Square-style IDs
+prevent duplicates. On reruns, matching seeded order fields and line items are
+refreshed in place and seeded payment amounts are updated to match; all other
+records are left alone. The seed refuses to rewrite a demo order if its
+line-item count differs from the fixture. To target a separate SQLite database, pass
 `--database-url sqlite:///./demo-ledger201.db`.
 
+Menu prices are the listed base prices in cents; options, modifiers, and
+additional charges are not represented. Demo tax is rounded to whole cents at
+approximately 8% of the discounted subtotal. September 12 is the clean
+reconciled example; September 14 keeps the existing completed partial refund,
+so that day's order remains `REVIEW_REQUIRED`.
+
 Timestamps continue to use timezone-aware Python datetimes, but SQLite may
-discard timezone offsets when values are read back. Reconciliation must
-normalize timestamps to a documented timezone convention before time-window
-matching. `create_all()` creates these new tables but does not migrate
-previously existing tables.
+discard timezone offsets when values are read back. Daily Review therefore
+uses the documented local-wall-time rule above. `create_all()` creates missing
+tables but does not migrate previously existing tables.
 
 ## Stop the server
 
