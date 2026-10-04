@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
@@ -49,3 +49,17 @@ def client():
         yield test_client
 
     Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture
+def db_session():
+    """Provide a session for direct service and persistence assertions."""
+
+    Base.metadata.create_all(bind=test_engine)
+    database: Session = TestingSessionLocal()
+
+    try:
+        yield database
+    finally:
+        database.close()
+        Base.metadata.drop_all(bind=test_engine)
