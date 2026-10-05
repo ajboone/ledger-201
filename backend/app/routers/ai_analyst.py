@@ -18,6 +18,7 @@ from app.services.daily_review import (
     DailyReviewCurrencyError,
     LocationNotFoundError,
 )
+from app.services.monthly_analyst import MonthlyAnalystValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,12 @@ def query_ai_analyst(
     """Answer a location-scoped question using deterministic Ledger tools."""
 
     try:
-        return run_ai_analyst_query(db, query.location_id, query.question)
+        return run_ai_analyst_query(
+            db,
+            query.location_id,
+            query.question,
+            history=query.history,
+        )
     except LocationNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -47,6 +53,7 @@ def query_ai_analyst(
     except (
         AnalystValidationError,
         DailyReviewCurrencyError,
+        MonthlyAnalystValidationError,
     ) as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

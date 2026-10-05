@@ -1,6 +1,10 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+MAX_AI_ANALYST_HISTORY_MESSAGES = 10
 
 
 class VendorCreate(BaseModel):
@@ -524,11 +528,32 @@ class AnalystDailyComparison(BaseModel):
     reconciliation_status_b: str
 
 
+class AIAnalystConversationMessage(BaseModel):
+    """One user or assistant message; each content value is limited to 2,000 characters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("content")
+    @classmethod
+    def strip_history_content(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Conversation message content must not be empty.")
+        return normalized
+
+
 class AIAnalystQueryRequest(BaseModel):
-    """Question and trusted Ledger location context for the AI analyst."""
+    """Question, trusted location, and at most ten recent conversational messages."""
 
     question: str = Field(..., min_length=1, max_length=4000)
     location_id: int = Field(..., gt=0)
+    history: list[AIAnalystConversationMessage] = Field(
+        default_factory=list,
+        max_length=MAX_AI_ANALYST_HISTORY_MESSAGES,
+    )
 
     @field_validator("question")
     @classmethod

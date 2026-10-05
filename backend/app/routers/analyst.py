@@ -18,6 +18,26 @@ from app.services.daily_review import (
     DailyReviewCurrencyError,
     LocationNotFoundError,
 )
+from app.services.monthly_analyst import (
+    MonthlyAnalystValidationError,
+    MonthlyReportNotFoundError,
+    compare_monthly_reports,
+    get_data_coverage,
+    get_latest_square_report,
+    get_monthly_category_performance,
+    get_monthly_discount_summary,
+    get_monthly_report_summary,
+    get_monthly_top_items,
+)
+from app.square_sales_report_schemas import (
+    LatestSquareReport,
+    MonthlyCategoryPerformance,
+    MonthlyDataCoverage,
+    MonthlyDiscountSummary,
+    MonthlyReportComparison,
+    MonthlyReportSummary,
+    MonthlyTopItem,
+)
 
 
 router = APIRouter(
@@ -27,7 +47,7 @@ router = APIRouter(
 
 
 def _raise_analyst_http_error(error: Exception) -> None:
-    if isinstance(error, LocationNotFoundError):
+    if isinstance(error, (LocationNotFoundError, MonthlyReportNotFoundError)):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
@@ -121,6 +141,131 @@ def read_discount_summary(
     try:
         return get_discount_summary(db, location_id, review_date)
     except (LocationNotFoundError, DailyReviewCurrencyError, AnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/monthly-summary",
+    response_model=MonthlyReportSummary,
+)
+def read_monthly_summary(
+    location_id: int = Query(..., gt=0),
+    year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> MonthlyReportSummary:
+    """Return the imported monthly Square report summary for one location and month."""
+
+    try:
+        return get_monthly_report_summary(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/monthly-top-items",
+    response_model=list[MonthlyTopItem],
+)
+def read_monthly_top_items(
+    location_id: int = Query(..., gt=0),
+    year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12),
+    limit: int = Query(default=10, ge=1),
+    db: Session = Depends(get_db),
+) -> list[MonthlyTopItem]:
+    """Return ranked monthly item performance from the imported Square report."""
+
+    try:
+        return get_monthly_top_items(db, location_id, year, month, limit)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/monthly-categories",
+    response_model=list[MonthlyCategoryPerformance],
+)
+def read_monthly_category_performance(
+    location_id: int = Query(..., gt=0),
+    year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> list[MonthlyCategoryPerformance]:
+    """Return monthly category totals from the imported Square report."""
+
+    try:
+        return get_monthly_category_performance(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/monthly-discounts",
+    response_model=MonthlyDiscountSummary,
+)
+def read_monthly_discount_summary(
+    location_id: int = Query(..., gt=0),
+    year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> MonthlyDiscountSummary:
+    """Return total monthly discounts and individual discount usage details."""
+
+    try:
+        return get_monthly_discount_summary(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/latest-report",
+    response_model=LatestSquareReport,
+)
+def read_latest_square_report(
+    location_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+) -> LatestSquareReport:
+    """Return the newest imported Square report metadata for a location."""
+
+    try:
+        return get_latest_square_report(db, location_id)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/monthly-compare",
+    response_model=MonthlyReportComparison,
+)
+def read_monthly_comparison(
+    location_id: int = Query(..., gt=0),
+    year_a: int = Query(..., ge=1970),
+    month_a: int = Query(..., ge=1, le=12),
+    year_b: int = Query(..., ge=1970),
+    month_b: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> MonthlyReportComparison:
+    """Compare two imported month-level Square report periods deterministically."""
+
+    try:
+        return compare_monthly_reports(db, location_id, year_a, month_a, year_b, month_b)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get(
+    "/coverage",
+    response_model=MonthlyDataCoverage,
+)
+def read_data_coverage(
+    location_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+) -> MonthlyDataCoverage:
+    """Describe the available monthly and transaction-level data coverage for a location."""
+
+    try:
+        return get_data_coverage(db, location_id)
+    except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
         _raise_analyst_http_error(error)
 
 
