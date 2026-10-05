@@ -386,6 +386,12 @@ class OrderReconciliation(BaseModel):
     status: str
 
 
+class AnalystReconciliationException(OrderReconciliation):
+    """Order-level reconciliation exception with its amount currency."""
+
+    currency: str
+
+
 class ItemSummary(BaseModel):
     """Sales summary for one menu item on the review date."""
 
@@ -416,3 +422,132 @@ class DailyReview(BaseModel):
     reconciliation_status: str
     orders: list[OrderReconciliation]
     top_items: list[ItemSummary]
+
+
+class AnalystDailySummary(BaseModel):
+    """Compact deterministic financial facts for an analyst query."""
+
+    location_id: int
+    currency: str
+    review_date: date
+    order_count: int
+    subtotal_amount: int
+    discount_amount: int
+    tax_amount: int
+    service_charge_amount: int
+    order_total_amount: int
+    completed_payment_amount: int
+    completed_refund_amount: int
+    net_collected_amount: int
+    average_order_value: int
+    reconciliation_difference: int
+    reconciliation_status: str
+
+
+class AnalystTopItem(BaseModel):
+    """Ranked item performance using net item sales after line discounts."""
+
+    item_name: str
+    category_name: str | None
+    currency: str
+    quantity_sold: int
+    sales_amount: int
+    rank: int
+
+
+class AnalystRefundDetail(BaseModel):
+    """Refund and associated transaction identifiers for analyst inspection."""
+
+    refund_id: int
+    square_refund_id: str | None
+    payment_id: int
+    square_payment_id: str | None
+    order_id: int
+    status: str
+    amount: int
+
+
+class AnalystRefundSummary(BaseModel):
+    """Refund counts and completed-refund total for a business date."""
+
+    location_id: int
+    currency: str
+    review_date: date
+    completed_refund_count: int
+    completed_refund_amount: int
+    pending_refund_count: int
+    failed_refund_count: int
+    refunds: list[AnalystRefundDetail]
+
+
+class AnalystDiscountSummary(BaseModel):
+    """Order-level discounts recorded for a business date."""
+
+    location_id: int
+    currency: str
+    review_date: date
+    total_discount_amount: int
+    discounted_order_count: int
+    order_count: int
+    discounted_order_percentage: float | None
+    discounted_order_ids: list[int]
+
+
+class AnalystDailyComparison(BaseModel):
+    """Deterministic daily metrics and changes between two business dates."""
+
+    location_id: int
+    currency: str
+    date_a: date
+    date_b: date
+    order_total_amount_a: int
+    order_total_amount_b: int
+    order_total_change: int
+    order_total_percentage_change: float | None
+    net_collected_amount_a: int
+    net_collected_amount_b: int
+    net_collected_change: int
+    net_collected_percentage_change: float | None
+    order_count_a: int
+    order_count_b: int
+    order_count_change: int
+    average_order_value_a: int
+    average_order_value_b: int
+    average_order_value_change: int
+    completed_refund_amount_a: int
+    completed_refund_amount_b: int
+    refund_amount_change: int
+    discount_amount_a: int
+    discount_amount_b: int
+    discount_amount_change: int
+    reconciliation_status_a: str
+    reconciliation_status_b: str
+
+
+class AIAnalystQueryRequest(BaseModel):
+    """Question and trusted Ledger location context for the AI analyst."""
+
+    question: str = Field(..., min_length=1, max_length=4000)
+    location_id: int = Field(..., gt=0)
+
+    @field_validator("question")
+    @classmethod
+    def strip_question(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Question must not be empty.")
+        return normalized
+
+
+class AIAnalystToolCallTrace(BaseModel):
+    """Non-sensitive summary of a deterministic tool invoked for a query."""
+
+    tool: str
+    arguments: dict[str, str | int]
+
+
+class AIAnalystQueryResponse(BaseModel):
+    """Final model answer and optional deterministic tool-call trace."""
+
+    answer: str
+    tool_calls_used: list[AIAnalystToolCallTrace]

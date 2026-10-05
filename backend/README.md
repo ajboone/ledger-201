@@ -156,6 +156,54 @@ currency of their parent record rather than combining incomparable amounts.
 Average order value is order total divided by order count, rounded to the
 nearest minor unit.
 
+## Deterministic analyst endpoints
+
+The read-only `/api/analyst` endpoints expose structured facts for later
+analysis without using an LLM or changing ledger data:
+
+- `GET /api/analyst/daily-summary?location_id=<id>&date=YYYY-MM-DD`
+- `GET /api/analyst/reconciliation-exceptions?location_id=<id>&date=YYYY-MM-DD`
+- `GET /api/analyst/top-items?location_id=<id>&date=YYYY-MM-DD&limit=5`
+- `GET /api/analyst/refunds?location_id=<id>&date=YYYY-MM-DD`
+- `GET /api/analyst/discounts?location_id=<id>&date=YYYY-MM-DD`
+- `GET /api/analyst/compare?location_id=<id>&date_a=YYYY-MM-DD&date_b=YYYY-MM-DD`
+
+Daily summaries and comparisons use the same integer-cent calculations,
+location-local date boundaries, currency checks, and completed payment/refund
+rules as Daily Review. Item rankings sort by quantity sold, then net item sales,
+then case-insensitive item name (with exact item name as a final tie-breaker).
+Refund totals include only completed refunds; pending and failed refunds are
+reported separately. Comparison changes are date B minus date A, and
+percentage changes are `null` when the date A denominator is zero.
+
+## AI Analyst query
+
+`POST /api/ai-analyst/query` accepts a question and a trusted location ID:
+
+```json
+{
+  "question": "Why does September 14, 2026 require review?",
+  "location_id": 1
+}
+```
+
+The response contains an `answer` and a `tool_calls_used` trace. The model
+receives only approved function tools backed by deterministic analyst
+services; the application supplies the location ID, validates arguments, and
+returns tool results in integer minor currency units. The model is instructed
+to explain supplied results rather than recalculate them, distinguish facts
+from possible explanations, and ask for missing dates instead of guessing.
+Tool calls are limited to five iterations per request.
+
+Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the backend process
+environment or in `backend/.env` before using this endpoint. The backend loads
+that file from a path derived from `app/config.py`, independent of the working
+directory, without overriding values already supplied by the process
+environment. No model default is assumed. Missing configuration returns HTTP
+503. Provider or invalid model-tool responses return HTTP 502; unknown
+locations return HTTP 404. Never expose API keys in client requests or
+responses.
+
 ## Load Sushi 201 demo orders
 
 From the `backend` directory, run:

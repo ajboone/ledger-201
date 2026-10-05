@@ -3,7 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import models
 from app.database import Base, engine
-from app.routers import daily_review, locations, orders, payments, refunds, vendors
+from app.routers import (
+    ai_analyst,
+    analyst,
+    daily_review,
+    locations,
+    orders,
+    payments,
+    refunds,
+    vendors,
+)
 
 
 Base.metadata.create_all(bind=engine)
@@ -36,6 +45,8 @@ app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(refunds.router)
 app.include_router(daily_review.router)
+app.include_router(analyst.router)
+app.include_router(ai_analyst.router)
 
 
 @app.get("/")
