@@ -11,6 +11,7 @@ from app import schemas
 from app.provenance import REAL_PROVENANCE
 from app.config import load_environment
 from app.services import analyst
+from app.services import monthly_analyst
 from app.services.daily_review import (
     DailyReviewCurrencyError,
     LocationNotFoundError,
@@ -62,6 +63,34 @@ customers of wrongdoing without evidence.
 Prefer imported real Square monthly report tools for month-level business
 questions. Never use synthetic or demo daily transaction data to answer real
 business questions. Demo analysis is available only in Daily Review (Demo), not in chat tools.
+
+MONTHLY REPORT INTERPRETATION
+
+Use get_monthly_top_items_by_revenue for revenue leadership and
+get_monthly_top_items_by_quantity for unit-volume leadership. For ambiguous
+"best selling", state the ranking basis or show both. Item results retain the
+parent item_name and optional variation_name: never describe Regular or another
+modeled variation as a separate bestselling menu item. Rankings are reported
+item/variation rows, not an inferred aggregation across different variations.
+Use get_monthly_item_sales_metrics for reported sales per unit. This Decimal
+metric is in minor currency units per reported unit. It is not menu price,
+margin, or profit; discounts, modifiers, and report behavior may affect it.
+Without cost data, food cost, margin, and profitability cannot be determined.
+For a highest-margin question, explain that limitation; do not substitute a
+revenue-per-unit ranking and call it margin.
+Use get_monthly_sales_concentration for top-N revenue share; never invent the
+denominator or recompute percentages. Missing detail or a null share is not 0%.
+Use get_monthly_category_breakdown for menu-category questions and use only its
+menu_categories group for customer-facing menu rankings. Kitchen Print, Sushi
+Print, and Both Printers are operational production-routing categories, never
+cuisine categories or customer-facing menu departments. Use
+get_monthly_routing_mix for kitchen versus sushi comparisons, using language
+such as kitchen-routed, sushi-routed, or both-printer routed. Routing shares
+refer only to routing sales, not all restaurant sales or preparation workload.
+Classification is application interpretation layered over raw Square labels.
+Keep uncategorized and unknown separate; do not invent their business meaning.
+Prefer these interpreted tools to raw category-label rankings. Briefly explain
+data_quality_notes when they limit a conclusion; avoid raw label dumping.
 
 Use recent user and assistant messages to resolve omitted dates, periods,
 metrics, and references such as "that month", "the 17th", "those items",
@@ -157,6 +186,10 @@ class _MonthlyReportArguments(_ToolArguments):
 
 class _MonthlyTopItemsArguments(_MonthlyReportArguments):
     limit: int = Field(gt=0)
+
+
+class _MonthlyConcentrationArguments(_MonthlyReportArguments):
+    top_n: int = Field(gt=0)
 
 
 class _MonthlyComparisonArguments(_ToolArguments):
@@ -391,6 +424,29 @@ _TOOL_DEFINITIONS: list[dict[str, object]] = [
     },
 ]
 
+_MONTHLY_INTERPRETATION_TOOLS = {
+    "get_monthly_top_items_by_revenue": (monthly_analyst.get_monthly_top_items_by_revenue, _MonthlyTopItemsArguments, "Rank real monthly menu items by reported revenue; retain parent and variation names. Includes reported sales per unit, not price or profit."),
+    "get_monthly_top_items_by_quantity": (monthly_analyst.get_monthly_top_items_by_quantity, _MonthlyTopItemsArguments, "Rank real monthly menu items by reported unit volume, distinct from revenue leadership."),
+    "get_monthly_item_sales_metrics": (monthly_analyst.get_monthly_item_sales_metrics, _MonthlyReportArguments, "Get normalized item metrics and Decimal reported sales per unit in minor currency units, never menu price, margin, or profit."),
+    "get_monthly_sales_concentration": (monthly_analyst.get_monthly_sales_concentration, _MonthlyConcentrationArguments, "Compute top-N item revenue share using the authoritative report Items total; includes detail-quality notes."),
+    "get_monthly_category_breakdown": (monthly_analyst.get_monthly_category_breakdown, _MonthlyReportArguments, "Separate menu categories, operational routing, uncategorized, and unknown labels. Use menu_categories for best menu categories."),
+    "get_monthly_routing_mix": (monthly_analyst.get_monthly_routing_mix, _MonthlyReportArguments, "Compare kitchen, sushi, and both-printer operational routing sales and shares; not cuisine or menu departments."),
+}
+
+for _name, (_, _arguments, _description) in _MONTHLY_INTERPRETATION_TOOLS.items():
+    _properties = {"year": {"type": "integer", "minimum": 1970}, "month": {"type": "integer", "minimum": 1, "maximum": 12}}
+    if _arguments is _MonthlyTopItemsArguments:
+        _properties["limit"] = {"type": "integer", "minimum": 1}
+    elif _arguments is _MonthlyConcentrationArguments:
+        _properties["top_n"] = {"type": "integer", "minimum": 1}
+    _TOOL_DEFINITIONS.append({
+        "type": "function", "name": _name, "description": _description,
+        "parameters": {"type": "object", "properties": _properties,
+                       "required": list(_properties), "additionalProperties": False},
+        "strict": True,
+    })
+
+
 def _create_openai_client() -> tuple[_ResponsesClient, str]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or not api_key.strip():
@@ -512,6 +568,10 @@ def _tool_result(
                     db, location_id, parsed.date_a, parsed.date_b, provenances=REAL_PROVENANCE
                 ),
             )
+        elif name in _MONTHLY_INTERPRETATION_TOOLS:
+            calculate, argument_model, _ = _MONTHLY_INTERPRETATION_TOOLS[name]
+            parsed = argument_model.model_validate(arguments)
+            result = calculate(db, location_id, **parsed.model_dump())
         elif name == "get_monthly_report_summary":
             parsed = _MonthlyReportArguments.model_validate(arguments)
             result = get_monthly_report_summary(

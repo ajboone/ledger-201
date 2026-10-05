@@ -312,6 +312,63 @@ and AI daily tools work without including demo rows. Adapt the Daily Review
 label and filter together when adding a real-data mode. No Square API or
 transaction importer is added here.
 
+## Interpreted monthly Square analysis
+
+Monthly analysis uses the existing report and item/variation models; no schema
+migration or data rewrite is required. New imports recognize both vertical
+email rows (with or without the multiplication marker) and flattened rows such
+as `Teriyaki Chicken × 158 $2,386.40`. The marker is formatting, not part of
+the name. Older imports are normalized at read time without modifying raw rows.
+
+An immediate child with identical quantity and sales is folded into its parent
+only when indentation, an explicitly modeled variation label, or the same child
+label repeating after multiple distinct matching parents supports that
+interpretation. This works with labels other than `Regular`. Equal totals alone
+are insufficient: ambiguous pairs stay separate with a warning. Unassociated
+recognized child rows are excluded from normalized item analysis with a warning.
+Multi-variation hierarchies whose children do not repeat the parent aggregate
+are not reconstructed or summed by this rule. Review original source layout
+when those warnings occur; do not automatically relabel or delete stored rows.
+
+Revenue ranks sort by sales, quantity, case-insensitive item/variation names,
+then exact names. Volume ranks reverse the first two criteria. Rankings remain
+reported item/variation rows, not inferred parent totals across multiple
+variations. `reported_revenue_per_unit` uses Decimal division and HALF_UP
+rounding to four decimal places in **minor currency units per reported unit**.
+JSON represents Decimal values as strings. The metric means **reported sales
+per unit**, not menu price, margin, or profit. Zero quantity yields null.
+
+Top-N concentration divides normalized top-N sales by the authoritative
+report `item_sales_amount`, not by an incomplete detail sum. Percentages use
+Decimal HALF_UP rounding to two decimals. Missing item detail or a nonpositive
+denominator yields null. Detail mismatches produce notes; shares are not capped
+to hide inconsistencies. Routing shares use only the sum of the three recognized
+operational routing categories, with null shares for nonpositive totals.
+
+`square_category_classification.py` is a small extensible mapping: operational
+routing, menu category, uncategorized, or unknown. It is application
+interpretation, not authoritative Square business metadata. Raw labels remain
+available, and interpreted category responses include `raw_category_name`.
+Kitchen Print, Sushi Print, and Both Printers must not be called cuisine or menu
+departments. Unknown labels are never assigned guessed business meaning.
+
+New read-only endpoints under `/api/analyst`, all accepting `location_id`,
+`year`, and `month`:
+
+- `/monthly-top-items-revenue` and `/monthly-top-items-quantity` (`limit=10`)
+- `/monthly-item-sales-metrics`
+- `/monthly-category-breakdown`
+- `/monthly-routing-mix`
+- `/monthly-sales-concentration` (`top_n=5`; use `top_n=10` for top ten)
+
+The six matching approved AI tools distinguish revenue from volume and routing
+from menu categories, retain variation labels with parents, and surface data
+limitations. Cost/profitability claims remain unsupported without cost data.
+Existing monthly endpoints and transaction-provenance guards remain available.
+
+Live September smoke results and the remaining source ambiguity are documented
+in [monthly-intelligence-smoke.md](monthly-intelligence-smoke.md).
+
 ## Stop the server
 
 Press `Ctrl+C` in the terminal where Uvicorn is running.

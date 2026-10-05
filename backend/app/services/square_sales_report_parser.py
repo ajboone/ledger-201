@@ -3,6 +3,8 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.services.square_item_normalization import ItemRow, normalize_items
+from app.services.square_report_labels import clean_report_label
 
 
 class SquareSalesReportParseError(ValueError):
@@ -310,7 +312,7 @@ def _parse_table_row(line: str, section: str) -> tuple[str, Decimal, int] | None
     if match is None:
         return None
 
-    label = match.group("label").strip().rstrip("\t ")
+    label = clean_report_label(match.group("label"))
     if not label:
         return None
 
@@ -331,12 +333,15 @@ def _parse_vertical_row(
 ) -> tuple[str, Decimal, int, int] | None:
     if index + 2 >= len(lines):
         return None
-    quantity_match = _QUANTITY_RE.fullmatch(lines[index + 1][1])
+    quantity_text = lines[index + 1][1]
+    quantity_match = _QUANTITY_RE.fullmatch(quantity_text)
+    if quantity_match is None:
+        quantity_match = re.fullmatch(r"(?P<quantity>\d+(?:\.\d+)?)", quantity_text)
     amount_text = lines[index + 2][1]
     if quantity_match is None or not _VERTICAL_MONEY_RE.fullmatch(amount_text):
         return None
 
-    label = lines[index][1].strip()
+    label = clean_report_label(lines[index][1])
     if not label:
         raise SquareSalesReportParseError(
             f"Line {lines[index][0]}: {section} name must not be blank."
@@ -371,16 +376,20 @@ def parse_square_sales_report(raw_text: str) -> ParsedSquareSalesReport:
     Money keeps the sign shown in the source report. Parenthesized or explicitly
     negative values remain negative; unmarked values remain positive.
 
-    In email reports, an item followed by a matching quantity/amount variation
-    row is stored once as the parent item with the variation label. Square
-    repeats the parent's aggregate on that variation row, so retaining both
-    would double-count sales.
+    An immediate matching quantity/amount child is stored once with its parent
+    when indentation or repeated parent/variation structure supplies evidence.
+    Equal totals alone are ambiguous and do not justify merging distinct items.
+    Both vertical email text and flattened one-line quantity markers work.
     """
 
     if not isinstance(raw_text, str) or not raw_text.strip():
         raise SquareSalesReportParseError("Square report text must not be empty.")
 
     normalized_text = raw_text.replace("\u00a0", " ")
+    indentation = {
+        number: len(line) - len(line.lstrip())
+        for number, line in enumerate(normalized_text.splitlines(), start=1)
+    }
     lines = [
         (line_number, re.sub(r"[ \t]+$", "", line).strip())
         for line_number, line in enumerate(normalized_text.splitlines(), start=1)
@@ -412,6 +421,9 @@ def parse_square_sales_report(raw_text: str) -> ParsedSquareSalesReport:
     discounts: list[ParsedDiscount] = []
     categories: list[ParsedCategorySales] = []
     items: list[ParsedItemSales] = []
+    item_rows: list[ItemRow] = []
+    previous_item_indent = None
+    previous_item_end = None
     warnings: list[str] = []
     seen_sections: set[str] = set()
     current_section: str | None = None
@@ -424,6 +436,7 @@ def parse_square_sales_report(raw_text: str) -> ParsedSquareSalesReport:
 
         recognized_section = _section(line)
         if recognized_section is not None:
+            previous_item_indent = None
             current_section = recognized_section
             if current_section != "metadata":
                 seen_sections.add(current_section)
@@ -541,27 +554,18 @@ def parse_square_sales_report(raw_text: str) -> ParsedSquareSalesReport:
                         label,
                         allow_aligned_columns=item_variation_column,
                     )
-                else:
-                    variation_row = _parse_vertical_row(
-                        lines,
-                        next_index,
-                        current_section,
-                    )
-                    if (
-                        variation_row is not None
-                        and variation_row[1] == quantity
-                        and variation_row[2] == amount
-                    ):
-                        variation_name = variation_row[0]
-                        next_index = variation_row[3]
-                items.append(
-                    ParsedItemSales(
+                item_rows.append(
+                    ItemRow(
                         item_name=item_name,
                         variation_name=variation_name,
                         quantity=quantity,
                         sales_amount=amount,
+                        child_like=(previous_item_end == index and previous_item_indent is not None and indentation[line_number] > previous_item_indent),
+                        follows_previous=previous_item_end == index,
                     )
                 )
+                previous_item_indent = indentation[line_number]
+                previous_item_end = next_index
         except ValueError as error:
             raise SquareSalesReportParseError(
                 f"Line {line_number}: invalid {current_section} row: {error}"
@@ -573,6 +577,12 @@ def parse_square_sales_report(raw_text: str) -> ParsedSquareSalesReport:
             f"Missing currency value for required metric {pending_metric}."
         )
 
+    normalized_items, item_warnings = normalize_items(item_rows)
+    items = [ParsedItemSales(
+        item_name=row.item_name, variation_name=row.variation_name,
+        quantity=row.quantity, sales_amount=row.sales_amount,
+    ) for row in normalized_items]
+    warnings.extend(item_warnings)
     missing_metrics = [name for name in _REQUIRED_METRICS if name not in metrics]
     if missing_metrics:
         raise SquareSalesReportParseError(

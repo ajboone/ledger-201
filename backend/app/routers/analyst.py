@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.services import monthly_analyst
+from app import square_sales_report_schemas as monthly_schemas
 from app.database import get_db
 from app.services.analyst import (
     AnalystValidationError,
@@ -196,6 +198,75 @@ def read_monthly_category_performance(
     try:
         return get_monthly_category_performance(db, location_id, year, month)
     except (LocationNotFoundError, MonthlyReportNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-top-items-revenue", response_model=list[MonthlyTopItem])
+def read_monthly_top_items_revenue(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), limit: int = Query(10, ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_top_items_by_revenue(db, location_id, year, month, limit)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-top-items-quantity", response_model=list[MonthlyTopItem])
+def read_monthly_top_items_quantity(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), limit: int = Query(10, ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_top_items_by_quantity(db, location_id, year, month, limit)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-item-sales-metrics", response_model=monthly_schemas.MonthlyItemSalesMetrics)
+def read_monthly_item_metrics(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_item_sales_metrics(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-category-breakdown", response_model=monthly_schemas.MonthlyCategoryBreakdown)
+def read_monthly_category_breakdown(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_category_breakdown(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-routing-mix", response_model=monthly_schemas.MonthlyRoutingMix)
+def read_monthly_routing_mix(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_routing_mix(db, location_id, year, month)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
+        _raise_analyst_http_error(error)
+
+
+@router.get("/monthly-sales-concentration", response_model=monthly_schemas.MonthlySalesConcentration)
+def read_monthly_concentration(
+    location_id: int = Query(..., gt=0), year: int = Query(..., ge=1970),
+    month: int = Query(..., ge=1, le=12), top_n: int = Query(5, ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        return monthly_analyst.get_monthly_sales_concentration(db, location_id, year, month, top_n)
+    except (LocationNotFoundError, MonthlyAnalystValidationError) as error:
         _raise_analyst_http_error(error)
 
 

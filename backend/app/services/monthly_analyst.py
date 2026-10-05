@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,6 +8,9 @@ from sqlalchemy.orm import Session
 from app import models
 from app.provenance import REAL_PROVENANCE
 from app.services.daily_review import LocationNotFoundError
+from app.services.square_category_classification import classify_category
+from app.services.square_item_normalization import ItemRow, normalize_items
+from app.services.square_report_labels import clean_report_label
 from app.square_sales_report_schemas import (
     LatestSquareReport,
     MonthlyCategoryPerformance,
@@ -16,6 +20,11 @@ from app.square_sales_report_schemas import (
     MonthlyReportComparison,
     MonthlyReportSummary,
     MonthlyTopItem,
+    MonthlyItemSalesMetrics,
+    MonthlySalesConcentration,
+    MonthlyCategoryBreakdown,
+    MonthlyRoutingCategory,
+    MonthlyRoutingMix,
 )
 
 
@@ -155,25 +164,130 @@ def get_monthly_top_items(
             f"No Square monthly report was found for {year}-{month:02d}."
         )
 
-    ranked_rows = sorted(
-        report.item_sales,
-        key=lambda row: (
-            -row.sales_amount,
-            -_float_quantity(row.quantity),
-            (row.item_name or "").casefold(),
-            (row.variation_name or "").casefold(),
+    return _rank_items(report, "revenue", limit)
+
+
+def _analysis_report(db: Session, location_id: int, year: int, month: int):
+    _location_or_raise(db, location_id)
+    report = _report_for_month(db, location_id, year, month)
+    if report is None:
+        raise MonthlyReportNotFoundError(f"No Square monthly report was found for {year}-{month:02d}.")
+    return report
+
+
+def _context(report):
+    return dict(report_id=report.id, report_start=report.report_start,
+                report_end=report.report_end, currency=report.location.currency)
+
+
+def _normalized_report_items(report):
+    rows, notes = normalize_items([
+        ItemRow(row.item_name, row.variation_name, Decimal(str(row.quantity)), row.sales_amount)
+        for row in sorted(report.item_sales, key=lambda row: row.id)
+    ])
+    if not rows:
+        notes.append("No usable item detail was reported; a ranking cannot be established.")
+    if sum(row.sales_amount for row in rows) != report.item_sales_amount:
+        notes.append("Normalized item detail does not reconcile to the report's Items total; rankings cover reported detail only and concentration may be incomplete.")
+    return rows, notes
+
+
+def _rank_items(report, sort_by: str, limit: int | None = None):
+    rows, notes = _normalized_report_items(report)
+    def key(row):
+        metrics = (-row.sales_amount, -row.quantity) if sort_by == "revenue" else (-row.quantity, -row.sales_amount)
+        return (*metrics, row.item_name.casefold(), (row.variation_name or "").casefold(), row.item_name, row.variation_name or "")
+    return [MonthlyTopItem(
+        item_name=row.item_name, variation_name=row.variation_name,
+        quantity=float(row.quantity), sales_amount=row.sales_amount, rank=rank,
+        reported_revenue_per_unit=(
+            (Decimal(row.sales_amount) / row.quantity).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            if row.quantity else None
+        ),
+        data_quality_notes=notes,
+    ) for rank, row in enumerate(sorted(rows, key=key)[:limit], start=1)]
+
+
+def _positive_integer(value: int, name: str):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise MonthlyAnalystValidationError(f"{name} must be a positive integer.")
+
+
+def get_monthly_top_items_by_revenue(db: Session, location_id: int, year: int, month: int, limit: int = 10):
+    """Rank reported item/variation rows by revenue, then quantity, then name."""
+    _positive_integer(limit, "limit")
+    return _rank_items(_analysis_report(db, location_id, year, month), "revenue", limit)
+
+
+def get_monthly_top_items_by_quantity(db: Session, location_id: int, year: int, month: int, limit: int = 10):
+    """Rank reported item/variation rows by quantity, then revenue, then name."""
+    _positive_integer(limit, "limit")
+    return _rank_items(_analysis_report(db, location_id, year, month), "quantity", limit)
+
+
+def get_monthly_item_sales_metrics(db: Session, location_id: int, year: int, month: int):
+    report = _analysis_report(db, location_id, year, month)
+    items = _rank_items(report, "revenue")
+    _, notes = _normalized_report_items(report)
+    return MonthlyItemSalesMetrics(**_context(report), items=items, data_quality_notes=notes)
+
+
+def _share(amount: int, total: int) -> Decimal | None:
+    if total <= 0:
+        return None
+    return (Decimal(amount) * 100 / Decimal(total)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def get_monthly_sales_concentration(db: Session, location_id: int, year: int, month: int, top_n: int = 5):
+    report = _analysis_report(db, location_id, year, month)
+    _positive_integer(top_n, "top_n")
+    rows, notes = _normalized_report_items(report)
+    top_sales = sum(row.sales_amount for row in sorted(rows, key=lambda row: -row.sales_amount)[:top_n])
+    if report.item_sales_amount <= 0:
+        notes.append("Revenue share is undefined when the report's Items total is zero or negative.")
+    return MonthlySalesConcentration(
+        **_context(report), top_n=top_n, top_n_sales=top_sales,
+        total_item_sales=report.item_sales_amount,
+        revenue_share_percent=_share(top_sales, report.item_sales_amount) if rows else None,
+        data_quality_notes=notes,
+    )
+
+
+def _category_rows(report):
+    return [MonthlyCategoryPerformance(
+        category_name=clean_report_label(row.category_name), raw_category_name=row.category_name,
+        quantity=float(row.quantity), sales_amount=row.sales_amount,
+        classification=classify_category(row.category_name),
+    ) for row in sorted(report.category_sales, key=lambda row: (
+        -row.sales_amount, -row.quantity, row.category_name.casefold(), row.category_name,
+    ))]
+
+
+def get_monthly_category_breakdown(db: Session, location_id: int, year: int, month: int):
+    report = _analysis_report(db, location_id, year, month)
+    rows = _category_rows(report)
+    return MonthlyCategoryBreakdown(
+        **_context(report),
+        menu_categories=[r for r in rows if r.classification == "menu_category"],
+        routing_categories=[r for r in rows if r.classification == "operational_routing"],
+        uncategorized=[r for r in rows if r.classification == "uncategorized"],
+        unknown=[r for r in rows if r.classification == "unknown"],
+    )
+
+
+def get_monthly_routing_mix(db: Session, location_id: int, year: int, month: int):
+    report = _analysis_report(db, location_id, year, month)
+    rows = [r for r in _category_rows(report) if r.classification == "operational_routing"]
+    total = sum(row.sales_amount for row in rows)
+    return MonthlyRoutingMix(
+        **_context(report), total_routing_sales=total,
+        categories=[MonthlyRoutingCategory(**row.model_dump(), revenue_share_percent=_share(row.sales_amount, total)) for row in rows],
+        data_quality_notes=(
+            ["No operational routing categories were reported."] if not rows
+            else ["Routing shares are undefined when routing sales total is zero or negative."] if total <= 0
+            else []
         ),
     )
-    return [
-        MonthlyTopItem(
-            item_name=row.item_name,
-            variation_name=row.variation_name,
-            quantity=_float_quantity(row.quantity),
-            sales_amount=row.sales_amount,
-            rank=rank,
-        )
-        for rank, row in enumerate(ranked_rows[:limit], start=1)
-    ]
 
 
 def get_monthly_category_performance(
@@ -203,6 +317,7 @@ def get_monthly_category_performance(
             category_name=row.category_name,
             quantity=_float_quantity(row.quantity),
             sales_amount=row.sales_amount,
+            classification=classify_category(row.category_name),
         )
         for row in rows
     ]

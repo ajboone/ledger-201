@@ -39,3 +39,39 @@ test("assistant HTML and unsafe URLs cannot become executable content", () => {
   assert.equal(body.querySelector("script, img, iframe"), null);
   assert.doesNotMatch(body.innerHTML, /javascript:|onerror=/);
 });
+
+const salesTable = "| Item | Reported sales | Units |\n|---|---:|---:|\n| **Teriyaki Chicken** | $2,386.40 | 158 |\n| Hibachi Steak | $1,806.14 | 86 |";
+
+test("assistant GFM tables render semantic headers, rows, aligned numbers, and inline emphasis", () => {
+  const body = render(salesTable);
+  assert.equal(body.querySelectorAll("table").length, 1);
+  assert.deepEqual([...body.querySelectorAll("thead th")].map((cell) => cell.textContent), ["Item", "Reported sales", "Units"]);
+  assert.equal(body.querySelectorAll("tbody tr").length, 2);
+  assert.equal(body.querySelectorAll("tbody td").length, 6);
+  assert.equal(body.querySelector("td strong").textContent, "Teriyaki Chicken");
+  assert.equal(body.querySelector("tbody td:nth-child(2)").textContent, "$2,386.40");
+  assert.equal(body.querySelector("tbody td:nth-child(2)").style.textAlign, "right");
+  assert.doesNotMatch(body.textContent, /\|---|\*\*/);
+});
+
+test("tables have a labeled, keyboard-focusable scroll wrapper", () => {
+  const body = render(salesTable);
+  const wrapper = body.querySelector("table").parentElement;
+  assert.equal(wrapper.className, "chatbot-table-scroll");
+  assert.equal(wrapper.getAttribute("role"), "region");
+  assert.equal(wrapper.getAttribute("aria-label"), "Assistant data table");
+  assert.equal(wrapper.tabIndex, 0);
+});
+
+test("user table syntax stays plain text", () => {
+  const body = render(salesTable, "user");
+  assert.equal(body.textContent, salesTable);
+  assert.equal(body.querySelector("table, strong"), null);
+});
+
+test("raw HTML stays disabled inside GFM tables", () => {
+  const body = render('| Item | Sales |\n|---|---:|\n| <img src=x onerror="alert(1)">Safe | $10 |');
+  assert.equal(body.querySelectorAll("table").length, 1);
+  assert.equal(body.querySelector("img, script"), null);
+  assert.doesNotMatch(body.innerHTML, /onerror=/);
+});

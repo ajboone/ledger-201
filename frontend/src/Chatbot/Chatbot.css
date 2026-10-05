@@ -95,6 +95,7 @@
 }
 
 .chatbot-message {
+  min-width: 0;
   max-width: min(88%, 42rem);
   padding: 0.85rem 1rem;
   border-radius: 1rem;
@@ -139,6 +140,37 @@
 .chatbot-markdown pre code { padding: 0; }
 .chatbot-markdown a { color: #276840; text-decoration: underline; }
 .chatbot-markdown a:focus-visible { outline: 2px solid #276840; outline-offset: 3px; }
+.chatbot-table-scroll {
+  max-width: 100%;
+  margin: 0.65rem 0;
+  overflow-x: auto;
+  border: 1px solid #dce5df;
+  border-radius: 0.5rem;
+}
+.chatbot-table-scroll:focus-visible {
+  outline: 2px solid #276840;
+  outline-offset: 2px;
+}
+.chatbot-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.chatbot-table-scroll th,
+.chatbot-table-scroll td {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid #e5ece7;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.chatbot-table-scroll th {
+  background: #f0f4f1;
+  color: #30483a;
+  font-weight: 650;
+}
+.chatbot-table-scroll tbody tr:last-child td { border-bottom: 0; }
 .chatbot-markdown blockquote {
   margin: 0.6rem 0;
   padding-left: 0.8rem;

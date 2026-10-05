@@ -1,4 +1,6 @@
 from datetime import date, datetime
+from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -125,14 +127,59 @@ class MonthlyTopItem(BaseModel):
     quantity: float
     sales_amount: int
     rank: int
+    reported_revenue_per_unit: Decimal | None = Field(
+        default=None, description="Reported sales per unit in minor currency units, rounded to 4 decimals; not price, margin, or profit.",
+    )
+    data_quality_notes: list[str] = Field(default_factory=list)
 
 
 class MonthlyCategoryPerformance(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     category_name: str
+    raw_category_name: str | None = None
     quantity: float
     sales_amount: int
+    classification: Literal["operational_routing", "menu_category", "uncategorized", "unknown"] = "unknown"
+
+
+class MonthlyAnalysisContext(BaseModel):
+    report_id: int
+    report_start: date
+    report_end: date
+    currency: str
+    data_quality_notes: list[str] = Field(default_factory=list)
+
+
+class MonthlyItemSalesMetrics(MonthlyAnalysisContext):
+    metric_label: str = "reported sales per unit"
+    revenue_per_unit_unit: str = "minor currency units per reported unit"
+    items: list[MonthlyTopItem]
+
+
+class MonthlySalesConcentration(MonthlyAnalysisContext):
+    top_n: int
+    top_n_sales: int
+    total_item_sales: int
+    revenue_share_percent: Decimal | None
+
+
+class MonthlyCategoryBreakdown(MonthlyAnalysisContext):
+    classification_basis: str = "Application interpretation of Square's raw category labels"
+    menu_categories: list[MonthlyCategoryPerformance]
+    routing_categories: list[MonthlyCategoryPerformance]
+    uncategorized: list[MonthlyCategoryPerformance]
+    unknown: list[MonthlyCategoryPerformance]
+
+
+class MonthlyRoutingCategory(MonthlyCategoryPerformance):
+    revenue_share_percent: Decimal | None
+
+
+class MonthlyRoutingMix(MonthlyAnalysisContext):
+    total_routing_sales: int
+    categories: list[MonthlyRoutingCategory]
+    interpretation: str = "Operational production routing, not cuisine or menu departments; shares use only reported routing sales."
 
 
 class MonthlyDiscountDetail(BaseModel):
