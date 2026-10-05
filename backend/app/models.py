@@ -1,12 +1,16 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Date,
     ForeignKey,
     Integer,
+    Numeric,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -85,6 +89,169 @@ class Location(Base):
     orders: Mapped[list["Order"]] = relationship(
         back_populates="location",
         cascade="all, delete-orphan",
+    )
+
+    square_sales_reports: Mapped[list["SquareSalesReport"]] = relationship(
+        back_populates="location",
+        cascade="all, delete-orphan",
+    )
+
+
+class SquareSalesReport(Base):
+    """Aggregate sales-report data imported from Square."""
+
+    __tablename__ = "square_sales_reports"
+    __table_args__ = (
+        UniqueConstraint(
+            "location_id",
+            "report_start",
+            "report_end",
+            name="uq_square_sales_reports_location_period",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    location_id: Mapped[int] = mapped_column(
+        ForeignKey("locations.id"),
+        nullable=False,
+        index=True,
+    )
+    report_start: Mapped[date] = mapped_column(Date, nullable=False)
+    report_end: Mapped[date] = mapped_column(Date, nullable=False)
+    report_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    reported_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    source_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="Square Sales Report",
+    )
+
+    gross_sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    item_sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    service_charge_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    returns_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    discount_comp_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    net_sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    tax_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    tips_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    gift_card_sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    refund_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_collected_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    fees_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    net_total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    location: Mapped[Location] = relationship(
+        back_populates="square_sales_reports",
+    )
+    category_sales: Mapped[list["SquareCategorySales"]] = relationship(
+        back_populates="report",
+        cascade="all, delete-orphan",
+        order_by=lambda: SquareCategorySales.id,
+    )
+    item_sales: Mapped[list["SquareItemSales"]] = relationship(
+        back_populates="report",
+        cascade="all, delete-orphan",
+        order_by=lambda: SquareItemSales.id,
+    )
+    discount_summaries: Mapped[list["SquareDiscountSummary"]] = relationship(
+        back_populates="report",
+        cascade="all, delete-orphan",
+        order_by=lambda: SquareDiscountSummary.id,
+    )
+
+
+class SquareCategorySales(Base):
+    """Aggregate quantity and sales for a Square report category."""
+
+    __tablename__ = "square_category_sales"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_square_category_quantity_nonnegative"),
+        CheckConstraint(
+            "length(trim(category_name)) > 0",
+            name="ck_square_category_name_nonempty",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("square_sales_reports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    category_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    report: Mapped[SquareSalesReport] = relationship(
+        back_populates="category_sales",
+    )
+
+
+class SquareItemSales(Base):
+    """Aggregate quantity and sales for a Square report item/variation."""
+
+    __tablename__ = "square_item_sales"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_square_item_quantity_nonnegative"),
+        CheckConstraint(
+            "length(trim(item_name)) > 0",
+            name="ck_square_item_name_nonempty",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("square_sales_reports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    variation_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    sales_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    report: Mapped[SquareSalesReport] = relationship(
+        back_populates="item_sales",
+    )
+
+
+class SquareDiscountSummary(Base):
+    """Aggregate usage and amount for a Square report discount."""
+
+    __tablename__ = "square_discount_summaries"
+    __table_args__ = (
+        CheckConstraint(
+            "usage_count >= 0",
+            name="ck_square_discount_usage_count_nonnegative",
+        ),
+        CheckConstraint(
+            "length(trim(discount_name)) > 0",
+            name="ck_square_discount_name_nonempty",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("square_sales_reports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    discount_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    usage_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    report: Mapped[SquareSalesReport] = relationship(
+        back_populates="discount_summaries",
     )
 
 

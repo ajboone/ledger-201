@@ -204,6 +204,40 @@ environment. No model default is assumed. Missing configuration returns HTTP
 locations return HTTP 404. Never expose API keys in client requests or
 responses.
 
+## Aggregate Square Sales Report imports
+
+The first Square import path stores monthly sales-report aggregates. It does
+not create or infer Orders, Payments, or Refunds. All monetary values are
+stored as integer cents. Sign is preserved exactly as shown in the report:
+parentheses or a leading minus sign become negative; unmarked values remain
+positive. Discounts and fees are not converted to absolute values.
+
+Endpoints:
+
+- `POST /api/square-reports/import` with `location_id` and `raw_report_text`
+- `GET /api/square-reports` with an optional `location_id` filter
+- `GET /api/square-reports/{report_id}` for the summary and child sections
+
+The importer requires a report date range and all listed core Sales and
+Payments metrics. It parses optional Discounts Applied, Category Sales, and
+Item Sales sections in both horizontal table-like text and Square's vertical
+email layout (label, `× quantity`, amount). It ignores report metadata and
+the optional Covers count, and retains quantities to four decimal places.
+When an item row is immediately followed by a variation row with the same
+quantity and amount, the importer stores one item row using the parent name
+and the variation label; Square's repeated variation total is not stored as a
+second sale. A repeated location/date period returns
+HTTP 409 and does not overwrite the original import. Suspicious sales/net
+total relationships are reported as warnings; source amounts are retained.
+The parser is designed for labeled email-report text and is not a PDF, CSV, or
+spreadsheet decoder.
+
+Aggregate report data lives in `square_sales_reports`,
+`square_category_sales`, `square_item_sales`, and
+`square_discount_summaries`. Existing transaction models and analyst
+calculations remain separate. `create_all()` creates these missing tables for
+local development; it does not migrate existing tables.
+
 ## Load Sushi 201 demo orders
 
 From the `backend` directory, run:

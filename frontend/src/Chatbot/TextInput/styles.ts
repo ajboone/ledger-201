@@ -3,21 +3,27 @@ import type { CSSProperties } from "react";
 export const textInputWrapperStyles: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  padding: "2rem",
-  marginTop: "9rem",
-  borderRadius: "2rem",
-  width: "75%",
-  border: "15px solid rgba(6, 224, 86, 0.2)",
-  boxShadow: "0 0 24px rgba(6, 224, 86, 0.18)",
+  flex: "0 0 auto",
+  padding: "1.25rem",
+  borderRadius: "1.25rem",
+  width: "100%",
+  maxWidth: "48rem",
+  border: "8px solid rgba(6, 224, 86, 0.16)",
+  boxShadow: "0 0 24px rgba(6, 224, 86, 0.12)",
   backgroundColor: "#fff",
+  margin: "0 auto",
 };
 
 export const textAreaStyles: CSSProperties = {
   width: "100%",
-  height: "5rem",
+  minHeight: "5rem",
   border: "none",
   outline: "none",
   resize: "none",
+  background: "transparent",
+  color: "#17231c",
+  font: "inherit",
+  lineHeight: 1.5,
 };
 
 export const sendButtonWrapperStyles: CSSProperties = {
@@ -26,9 +32,11 @@ export const sendButtonWrapperStyles: CSSProperties = {
 };
 
 export const sendButtonStyles: CSSProperties = {
-  width: "8rem",
+  minWidth: "7rem",
+  padding: ".65rem 1rem",
   backgroundColor: "var(--green)",
   borderRadius: ".5rem",
+  border: "none",
   fontWeight: "500",
   cursor: "pointer",
 };

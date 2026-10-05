@@ -8,6 +8,7 @@ import Navbar from "./Navbar";
 import Vendor from "./Vendor";
 import Location from "./Location";
 import DailyReview from "./DailyReview/DailyReview";
+import SquareReports from "./SquareReports/SquareReports";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="vendor" element={<Vendor />} />
         <Route path="location" element={<Location />} />
         <Route path="daily-review" element={<DailyReview />} />
+        <Route path="square-reports" element={<SquareReports />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

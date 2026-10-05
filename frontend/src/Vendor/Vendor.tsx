@@ -16,23 +16,29 @@ const Vendor = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function loadVendors() {
       try {
         const vendorData = await getVendors();
-
-        setVendors(vendorData);
+        if (active) setVendors(vendorData);
       } catch (error) {
-        if (error instanceof Error) {
-          setErrorMessage(error.message);
-        } else {
-          setErrorMessage("An unknown error occurred.");
+        if (active) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Unable to load vendors. Please try again.",
+          );
         }
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     }
 
     void loadVendors();
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleCreateVendor(event: FormEvent<HTMLFormElement>) {
@@ -77,13 +83,21 @@ const Vendor = () => {
       <header>
         <p className="eyebrow">Restaurant operations platform</p>
         <h1>Ledger 201</h1>
-        <p className="description">
-          Vendor data loaded from the FastAPI backend.
-        </p>
+        <p className="description">Manage restaurant vendors.</p>
       </header>
 
       <section className="vendor-section">
-        <h2>Vendors</h2>
+        <div className="vendor-section-heading">
+          <div>
+            <p className="vendor-eyebrow">Supplier directory</p>
+            <h2>Vendors</h2>
+          </div>
+          {!isLoading && !errorMessage && (
+            <span className="vendor-count">
+              {vendors.length} {vendors.length === 1 ? "vendor" : "vendors"}
+            </span>
+          )}
+        </div>
 
         <form className="vendor-form" onSubmit={handleCreateVendor}>
           <label htmlFor="vendor-name">Vendor name</label>
@@ -115,24 +129,43 @@ const Vendor = () => {
           )}
         </form>
 
-        {isLoading && <p>Loading vendors...</p>}
+        {isLoading && (
+          <p className="vendor-state" role="status">
+            Loading vendors...
+          </p>
+        )}
 
         {errorMessage && (
-          <p className="error-message">
+          <p className="vendor-state vendor-error" role="alert">
             Unable to load vendors: {errorMessage}
           </p>
         )}
 
         {!isLoading && !errorMessage && vendors.length === 0 && (
-          <p>No vendors have been created yet.</p>
+          <p className="vendor-state">
+            No vendors yet. Add your first restaurant vendor above.
+          </p>
         )}
 
         {!isLoading && !errorMessage && vendors.length > 0 && (
           <ul className="vendor-list">
             {vendors.map((vendor) => (
-              <li key={vendor.id}>
-                <strong>{vendor.name}</strong>
-                <span>Vendor ID: {vendor.id}</span>
+              <li className="vendor-card" key={vendor.id}>
+                <span className="vendor-card-mark" aria-hidden="true">
+                  {vendor.name.trim().charAt(0).toUpperCase()}
+                </span>
+                <div className="vendor-card-details">
+                  <strong>{vendor.name}</strong>
+                  <span>Restaurant vendor</span>
+                </div>
+                <time dateTime={vendor.created_at}>
+                  Added{" "}
+                  {new Date(vendor.created_at).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </time>
               </li>
             ))}
           </ul>

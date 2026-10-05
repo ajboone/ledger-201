@@ -12,6 +12,7 @@ export const Navbar = () => {
     { label: "Vendor", href: "/vendor" },
     { label: "Locations", href: "/location" },
     { label: "Daily Review", href: "/daily-review" },
+    { label: "Square Reports", href: "/square-reports" },
   ];
 
   return (

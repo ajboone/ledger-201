@@ -11,6 +11,7 @@ from app.routers import (
     orders,
     payments,
     refunds,
+    square_sales_reports,
     vendors,
 )
 
@@ -47,6 +48,7 @@ app.include_router(refunds.router)
 app.include_router(daily_review.router)
 app.include_router(analyst.router)
 app.include_router(ai_analyst.router)
+app.include_router(square_sales_reports.router)
 
 
 @app.get("/")
