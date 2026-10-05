@@ -140,6 +140,7 @@ def seed_demo_data(db: Session) -> tuple[int, int]:
     inserted_orders = 0
     skipped_orders = 0
     for order_data in _demo_orders(location.id):
+        order_data.provenance = "demo"
         order = db.scalar(
             select(models.Order).where(
                 models.Order.square_order_id == order_data.square_order_id
@@ -177,6 +178,9 @@ def _refresh_demo_order(
             "than its deterministic fixture; refusing to delete or reset records."
         )
 
+    if order.provenance not in ("unknown", "demo"):
+        raise RuntimeError("Refusing to overwrite an order explicitly marked as real.")
+    order.provenance = "demo"
     order.state = order_data.state
     order.currency = order_data.currency
     order.created_at = order_data.created_at

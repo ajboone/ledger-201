@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.provenance import REAL_PROVENANCE
 from app.services.daily_review import LocationNotFoundError
 from app.square_sales_report_schemas import (
     LatestSquareReport,
@@ -445,19 +446,16 @@ def get_data_coverage(db: Session, location_id: int) -> MonthlyDataCoverage:
 
     latest_report = reports[0] if reports else None
     has_monthly_reports = bool(reports)
-    real_transaction_rows = list(
+    provenance_values = set(
         db.scalars(
-            select(models.Order)
+            select(models.Order.provenance).distinct()
             .where(models.Order.location_id == location_id)
-            .order_by(models.Order.created_at, models.Order.id)
         ).all()
     )
-    # Stored orders have no provenance field and may be seeded or entered
-    # manually, so their presence alone does not establish real imported data.
-    has_real_transaction_data = False
-    demo_transaction_data_present = any(
-        row.square_order_id and "demo" in row.square_order_id.lower()
-        for row in real_transaction_rows
+    has_real_transaction_data = bool(provenance_values.intersection(REAL_PROVENANCE))
+    demo_transaction_data_present = "demo" in provenance_values
+    real_granularity = (["monthly_aggregate"] if has_monthly_reports else []) + (
+        ["daily", "transaction"] if has_real_transaction_data else []
     )
 
     return MonthlyDataCoverage(
@@ -468,8 +466,12 @@ def get_data_coverage(db: Session, location_id: int) -> MonthlyDataCoverage:
         has_monthly_reports=has_monthly_reports,
         has_real_transaction_data=has_real_transaction_data,
         available_granularity=(
-            ["monthly_aggregate"]
+            (["monthly_aggregate"] if has_monthly_reports else [])
             + (["transaction_level"] if has_real_transaction_data else [])
         ),
         demo_transaction_data_present=demo_transaction_data_present,
+        has_demo_transaction_data=demo_transaction_data_present,
+        has_unknown_transaction_data="unknown" in provenance_values,
+        available_real_granularity=real_granularity,
+        available_demo_granularity=(["daily", "transaction"] if demo_transaction_data_present else []),
     )

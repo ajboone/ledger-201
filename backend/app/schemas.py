@@ -156,6 +156,7 @@ class OrderLineItemRead(BaseModel):
 class OrderCreate(BaseModel):
     """Data accepted when creating an order and its line items."""
 
+    provenance: Literal["demo", "square_import", "manual", "unknown"] = "unknown"
     location_id: int = Field(..., gt=0)
     square_order_id: str | None = Field(
         default=None,
@@ -218,6 +219,7 @@ class OrderCreate(BaseModel):
 class OrderRead(BaseModel):
     """Order data returned by the API."""
 
+    provenance: Literal["demo", "square_import", "manual", "unknown"]
     model_config = ConfigDict(from_attributes=True)
 
     id: int

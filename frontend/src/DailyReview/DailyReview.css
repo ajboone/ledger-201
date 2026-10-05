@@ -229,3 +229,14 @@
     padding: 1rem 0.75rem;
   }
 }
+.daily-review-demo-notice {
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid #e5dcc4;
+  border-radius: 0.8rem;
+  background: #fffcf4;
+  color: #68552c;
+  font-size: 0.875rem;
+}
+
+.daily-review-demo-notice p { margin: 0.3rem 0 0; }

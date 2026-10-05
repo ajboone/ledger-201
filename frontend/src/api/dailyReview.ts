@@ -8,6 +8,7 @@ export function getDailyReview(
   const query = new URLSearchParams({
     location_id: String(locationId),
     date: reviewDate,
+    provenance: "demo",
   });
   return apiRequest<DailyReview>(
     `/api/daily-review?${query.toString()}`,

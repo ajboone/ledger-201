@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.provenance import REAL_PROVENANCE
 from app.config import load_environment
 from app.services import analyst
 from app.services.daily_review import (
@@ -60,7 +61,7 @@ customers of wrongdoing without evidence.
 
 Prefer imported real Square monthly report tools for month-level business
 questions. Never use synthetic or demo daily transaction data to answer real
-business questions unless the user explicitly asks about demo data.
+business questions. Demo analysis is available only in Daily Review (Demo), not in chat tools.
 
 Use recent user and assistant messages to resolve omitted dates, periods,
 metrics, and references such as "that month", "the 17th", "those items",
@@ -428,14 +429,14 @@ def _daily_tool_result(
     location_id: int,
     calculate: Callable[[], _ToolResultModel | list[_ToolResultModel]],
 ) -> _ToolResultModel | list[_ToolResultModel] | dict[str, object]:
-    """Prevent demo/manual orders from being presented as real daily coverage."""
+    """Require explicit real provenance before executing real-only daily tools."""
 
     coverage = get_data_coverage(db, location_id)
     if not coverage.has_real_transaction_data:
         return {
             "error": "transaction_level_data_unavailable",
             "message": (
-                "Ledger has monthly aggregate Square data only for this location; "
+                "Real daily analysis is unavailable for this location; "
                 "it does not have real day-level transaction data."
             ),
         }
@@ -463,7 +464,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.get_daily_summary(
-                    db, location_id, parsed.review_date
+                    db, location_id, parsed.review_date, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "get_reconciliation_exceptions":
@@ -472,7 +473,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.get_reconciliation_exceptions(
-                    db, location_id, parsed.review_date
+                    db, location_id, parsed.review_date, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "get_top_items":
@@ -481,7 +482,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.get_top_items(
-                    db, location_id, parsed.review_date, parsed.limit
+                    db, location_id, parsed.review_date, parsed.limit, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "get_refund_summary":
@@ -490,7 +491,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.get_refund_summary(
-                    db, location_id, parsed.review_date
+                    db, location_id, parsed.review_date, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "get_discount_summary":
@@ -499,7 +500,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.get_discount_summary(
-                    db, location_id, parsed.review_date
+                    db, location_id, parsed.review_date, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "compare_daily_performance":
@@ -508,7 +509,7 @@ def _tool_result(
                 db,
                 location_id,
                 lambda: analyst.compare_daily_performance(
-                    db, location_id, parsed.date_a, parsed.date_b
+                    db, location_id, parsed.date_a, parsed.date_b, provenances=REAL_PROVENANCE
                 ),
             )
         elif name == "get_monthly_report_summary":

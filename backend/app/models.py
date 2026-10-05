@@ -259,7 +259,14 @@ class Order(Base):
     """A restaurant sales order tied to a specific location."""
 
     __tablename__ = "orders"
+    provenance: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unknown", server_default="unknown",
+    )
     __table_args__ = (
+        CheckConstraint(
+            "provenance IN ('demo', 'square_import', 'manual', 'unknown')",
+            name="ck_orders_provenance",
+        ),
         CheckConstraint("subtotal_amount >= 0", name="ck_orders_subtotal_nonnegative"),
         CheckConstraint("discount_amount >= 0", name="ck_orders_discount_nonnegative"),
         CheckConstraint("tax_amount >= 0", name="ck_orders_tax_nonnegative"),

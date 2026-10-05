@@ -469,11 +469,16 @@ const SquareReports = () => {
               <div>
                 <p className="square-reports-eyebrow">Report overview</p>
                 <h2>{report.report_name ?? "Square Sales Report"}</h2>
+                <p>Monthly aggregate report. This source does not contain day-level transaction detail.</p>
                 <p className="square-report-overview-period">
                   {formatDate(report.report_start)} – {formatDate(report.report_end)}
                 </p>
               </div>
               <dl className="square-report-metadata">
+                <div>
+                  <dt>Source</dt>
+                  <dd>Square Sales Report</dd>
+                </div>
                 <div>
                   <dt>Location</dt>
                   <dd>{selectedLocation?.name ?? "Selected location"}</dd>

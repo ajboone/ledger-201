@@ -1,4 +1,5 @@
 import logo from "../assets/logo.png";
+import { Link } from "react-router-dom";
 import { typography } from "../typography";
 import {
   logoStyles,
@@ -11,22 +12,22 @@ export const Navbar = () => {
     { label: "Chatbot", href: "/" },
     { label: "Vendor", href: "/vendor" },
     { label: "Locations", href: "/location" },
-    { label: "Daily Review", href: "/daily-review" },
+    { label: "Daily Review (Demo)", href: "/daily-review" },
     { label: "Square Reports", href: "/square-reports" },
   ];
 
   return (
     <nav style={navStyles}>
-      <a href="/" style={logoStyles}>
+      <Link to="/" style={logoStyles}>
         <img src={logo} alt="Ledger 201" width="200em" />
         <h1 style={typography.h1}>Ledger 201</h1>
-      </a>
+      </Link>
       <ul style={navItemsContainerStyles}>
         {navItems.map((item) => (
           <li key={item.label}>
-            <a style={navLinkStyles} href={item.href}>
+            <Link style={navLinkStyles} to={item.href}>
               {item.label}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

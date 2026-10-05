@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import type {
+  AIAnalystConversationMessage,
   AIAnalystQueryRequest,
   AIAnalystQueryResponse,
 } from "../types/aiAnalyst";
@@ -7,10 +8,12 @@ import type {
 export function queryAIAnalyst(
   question: string,
   locationId: number,
+  history: AIAnalystConversationMessage[],
 ): Promise<AIAnalystQueryResponse> {
   const request: AIAnalystQueryRequest = {
     question,
     location_id: locationId,
+    history,
   };
 
   return apiRequest<AIAnalystQueryResponse>(

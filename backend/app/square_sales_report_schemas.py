@@ -220,3 +220,7 @@ class MonthlyDataCoverage(BaseModel):
     has_real_transaction_data: bool
     available_granularity: list[str] = []
     demo_transaction_data_present: bool = False
+    has_demo_transaction_data: bool = False
+    has_unknown_transaction_data: bool = False
+    available_real_granularity: list[str] = []
+    available_demo_granularity: list[str] = []

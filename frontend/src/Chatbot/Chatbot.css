@@ -48,6 +48,38 @@
   font: inherit;
 }
 
+.chatbot-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  color: #65736b;
+  font-size: 0.75rem;
+}
+
+.chatbot-new-conversation {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(25, 55, 39, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #30483a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chatbot-new-conversation:hover:not(:disabled) {
+  background: #fff;
+}
+
+.chatbot-new-conversation:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .chatbot-messages {
   display: flex;
   flex: 1 1 auto;
@@ -71,8 +103,47 @@
 
 .chatbot-message p {
   line-height: 1.55;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.chatbot-user-text { white-space: pre-wrap; }
+
+.chatbot-markdown {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.chatbot-markdown p { margin: 0.55rem 0; }
+.chatbot-markdown .chatbot-section-label {
+  margin: 0.95rem 0 0.3rem;
+  font-size: 0.95rem;
+  color: #30483a;
+}
+.chatbot-markdown strong { font-weight: 650; }
+.chatbot-markdown ul, .chatbot-markdown ol {
+  margin: 0.4rem 0;
+  padding-left: 1.3rem;
+}
+.chatbot-markdown li { margin: 0.2rem 0; }
+.chatbot-markdown li p { margin: 0.2rem 0; }
+.chatbot-markdown > :first-child { margin-top: 0; }
+.chatbot-markdown > :last-child { margin-bottom: 0; }
+.chatbot-markdown code {
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.25rem;
+  background: #f0f4f1;
+  font-size: 0.88em;
+}
+.chatbot-markdown pre { overflow-x: auto; padding: 0.6rem; background: #f0f4f1; }
+.chatbot-markdown pre code { padding: 0; }
+.chatbot-markdown a { color: #276840; text-decoration: underline; }
+.chatbot-markdown a:focus-visible { outline: 2px solid #276840; outline-offset: 3px; }
+.chatbot-markdown blockquote {
+  margin: 0.6rem 0;
+  padding-left: 0.8rem;
+  border-left: 2px solid #dce5df;
+  color: #52605a;
 }
 
 .chatbot-message-label {
@@ -156,3 +227,16 @@
     max-width: 95%;
   }
 }
+.chatbot-coverage {
+  width: 100%;
+  max-width: 48rem;
+  box-sizing: border-box;
+  padding: 0.8rem 1rem;
+  border: 1px solid #dce5df;
+  border-radius: 0.8rem;
+  background: #f7faf8;
+  color: #405448;
+  font-size: 0.8rem;
+}
+
+.chatbot-coverage p { margin: 0.25rem 0 0; }

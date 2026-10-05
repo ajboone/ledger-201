@@ -27,19 +27,21 @@ def _get_review(
     db: Session,
     location_id: int,
     review_date: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> schemas.DailyReview:
     _validate_date(review_date, "review_date")
-    return get_daily_review(db, location_id, review_date)
+    return get_daily_review(db, location_id, review_date, provenances=provenances)
 
 
 def get_daily_summary(
     db: Session,
     location_id: int,
     review_date: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> schemas.AnalystDailySummary:
     """Return the financial totals calculated by the canonical Daily Review."""
 
-    review = _get_review(db, location_id, review_date)
+    review = _get_review(db, location_id, review_date, provenances=provenances)
     return schemas.AnalystDailySummary(
         location_id=review.location_id,
         currency=review.currency,
@@ -63,10 +65,11 @@ def get_reconciliation_exceptions(
     db: Session,
     location_id: int,
     review_date: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> list[schemas.AnalystReconciliationException]:
     """Return only order reconciliations that require review."""
 
-    review = _get_review(db, location_id, review_date)
+    review = _get_review(db, location_id, review_date, provenances=provenances)
     return [
         schemas.AnalystReconciliationException(
             **order.model_dump(),
@@ -82,13 +85,14 @@ def get_top_items(
     location_id: int,
     review_date: date,
     limit: int = 5,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> list[schemas.AnalystTopItem]:
     """Rank items by quantity, net sales, then case-insensitive item name."""
 
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise AnalystValidationError("limit must be a positive integer.")
 
-    review = _get_review(db, location_id, review_date)
+    review = _get_review(db, location_id, review_date, provenances=provenances)
     order_ids = [order.order_id for order in review.orders]
     category_names_by_item: dict[str, set[str]] = {}
     if order_ids:
@@ -140,10 +144,11 @@ def get_refund_summary(
     db: Session,
     location_id: int,
     review_date: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> schemas.AnalystRefundSummary:
     """Summarize refunds linked to the selected day's orders."""
 
-    review = _get_review(db, location_id, review_date)
+    review = _get_review(db, location_id, review_date, provenances=provenances)
     order_ids = [order.order_id for order in review.orders]
     refunds = (
         list(
@@ -198,10 +203,11 @@ def get_discount_summary(
     db: Session,
     location_id: int,
     review_date: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> schemas.AnalystDiscountSummary:
     """Summarize recorded order discounts without inferring discount types."""
 
-    review = _get_review(db, location_id, review_date)
+    review = _get_review(db, location_id, review_date, provenances=provenances)
     order_ids = [order.order_id for order in review.orders]
     discounted_order_ids = (
         list(
@@ -244,13 +250,14 @@ def compare_daily_performance(
     location_id: int,
     date_a: date,
     date_b: date,
+    *, provenances: tuple[str, ...] | None = None,
 ) -> schemas.AnalystDailyComparison:
     """Compare deterministic daily metrics; changes are date B minus date A."""
 
     _validate_date(date_a, "date_a")
     _validate_date(date_b, "date_b")
-    summary_a = get_daily_summary(db, location_id, date_a)
-    summary_b = get_daily_summary(db, location_id, date_b)
+    summary_a = get_daily_summary(db, location_id, date_a, provenances=provenances)
+    summary_b = get_daily_summary(db, location_id, date_b, provenances=provenances)
     if summary_a.currency != summary_b.currency:
         raise AnalystValidationError(
             "Daily performance cannot compare dates with different currencies."

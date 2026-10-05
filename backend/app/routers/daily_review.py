@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -25,12 +26,13 @@ router = APIRouter(
 def read_daily_review(
     location_id: int = Query(..., gt=0),
     review_date: date = Query(..., alias="date"),
+    provenance: Literal["demo", "square_import", "manual", "unknown"] | None = None,
     db: Session = Depends(get_db),
 ) -> schemas.DailyReview:
     """Return deterministic daily financial and item analysis."""
 
     try:
-        return get_daily_review(db, location_id, review_date)
+        return get_daily_review(db, location_id, review_date, provenances=(provenance,) if provenance else None)
     except LocationNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

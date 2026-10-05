@@ -152,16 +152,18 @@ def _run(
 def _allow_real_transaction_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.services import ai_analyst
 
+    def mark_real_fixture(db, location_id):
+        for order in db.scalars(select(models.Order).where(models.Order.location_id == location_id)):
+            order.provenance = "square_import"
+        db.flush()
+        coverage = get_data_coverage(db, location_id)
+        coverage.has_real_transaction_data = True
+        return coverage
+
     monkeypatch.setattr(
         ai_analyst,
         "get_data_coverage",
-        lambda db, location_id: MonthlyDataCoverage(
-            location_id=location_id,
-            monthly_report_count=0,
-            has_monthly_reports=False,
-            has_real_transaction_data=True,
-            available_granularity=["transaction_level"],
-        ),
+        mark_real_fixture,
     )
 
 
@@ -576,7 +578,7 @@ def test_endpoint_sanitizes_ledger_tool_execution_errors(
     )
     monkeypatch.setattr(
         "app.services.analyst.get_daily_summary",
-        lambda *args: (_ for _ in ()).throw(
+        lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("sensitive database failure")
         ),
     )
@@ -839,7 +841,7 @@ def test_the_17th_with_month_context_uses_coverage_not_demo_daily_facts(
 
     coverage = json.loads(fake_responses.calls[1]["input"][-1]["output"])
     assert coverage["has_real_transaction_data"] is False
-    assert coverage["available_granularity"] == ["monthly_aggregate"]
+    assert coverage["available_granularity"] == []
     assert [call.tool for call in result.tool_calls_used] == ["get_data_coverage"]
     assert "September 17, 2026" in result.answer
 
@@ -931,11 +933,11 @@ def test_daily_ai_tool_does_not_return_demo_or_manual_order_facts(
     coverage = get_data_coverage(db_session, location_id)
     tool_output = json.loads(fake_responses.calls[1]["input"][-1]["output"])
     assert coverage.has_real_transaction_data is False
-    assert coverage.available_granularity == ["monthly_aggregate"]
+    assert coverage.available_granularity == []
     assert tool_output == {
         "error": "transaction_level_data_unavailable",
         "message": (
-            "Ledger has monthly aggregate Square data only for this location; "
+            "Real daily analysis is unavailable for this location; "
             "it does not have real day-level transaction data."
         ),
     }

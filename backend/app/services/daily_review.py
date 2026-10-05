@@ -23,6 +23,8 @@ def get_daily_review(
     db: Session,
     location_id: int,
     review_date: date,
+    *,
+    provenances: tuple[str, ...] | None = None,
 ) -> schemas.DailyReview:
     """Calculate daily order, payment, refund, and item totals deterministically.
 
@@ -49,6 +51,7 @@ def get_daily_review(
                 models.Order.location_id == location.id,
                 models.Order.created_at >= start,
                 models.Order.created_at < end,
+                models.Order.provenance.in_(provenances) if provenances is not None else True,
             )
             .order_by(models.Order.created_at, models.Order.id)
         ).all()

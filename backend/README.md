@@ -268,6 +268,50 @@ discard timezone offsets when values are read back. Daily Review therefore
 uses the documented local-wall-time rule above. `create_all()` creates missing
 tables but does not migrate previously existing tables.
 
+## Transaction provenance and local migration
+
+`Order.provenance` is an explicit, constrained value: `demo`, `square_import`,
+`manual`, or `unknown` (the default). Line items, payments, and refunds inherit
+their parent Order's provenance; `Payment.source_type` still means payment
+method (CARD/CASH), not provenance. Use `manual` only for explicitly verified
+real manual entries and `square_import` for real transaction imports. The
+presence of a Square ID does not establish provenance.
+
+Before starting the updated app against an existing local SQLite database,
+back up that database and run from `backend`:
+
+```powershell
+python -m app.migrate_provenance
+python -m app.demo.seed
+```
+
+The migration is idempotent and marks all existing orders `unknown`, never
+real. The seed then marks only its four exact reserved `LEDGER201-DEMO-ORDER-001`
+through `004` fixtures as `demo`, preserving IDs, payments, refunds, and the
+September 14 reconciliation exception. It refuses to overwrite a fixture
+explicitly marked real. Arbitrary IDs, even those containing "demo", are not
+classified. For a separate database, call `migrate(target_engine)` before
+seeding it. New databases need no migration. `create_all()` alone cannot add
+this column to existing tables.
+
+Coverage separates real, demo, and unknown transactions by location. Legacy
+`available_granularity` describes real data only; the explicit
+`available_real_granularity` and `available_demo_granularity` fields distinguish
+daily/transaction coverage. No reports means no monthly granularity.
+
+AI daily tools require real provenance and filter every calculation to real
+orders, including in mixed datasets. Demo chat analysis remains disabled;
+use Daily Review (Demo) for synthetic analysis. The Daily Review page explicitly
+requests `provenance=demo`; the backend retains its unfiltered calculation API
+for compatibility and accepts an optional provenance filter. Coverage means
+records exist, not that every day is complete. Monthly tools continue to use
+imported Square aggregate reports.
+
+Future real imports should set explicit Order provenance, after which coverage
+and AI daily tools work without including demo rows. Adapt the Daily Review
+label and filter together when adding a real-data mode. No Square API or
+transaction importer is added here.
+
 ## Stop the server
 
 Press `Ctrl+C` in the terminal where Uvicorn is running.

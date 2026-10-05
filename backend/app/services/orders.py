@@ -38,6 +38,7 @@ def create_order(db: Session, order_data: schemas.OrderCreate) -> models.Order:
             )
 
     order = models.Order(
+        provenance=order_data.provenance,
         square_order_id=square_order_id,
         location_id=location.id,
         state=order_data.state,

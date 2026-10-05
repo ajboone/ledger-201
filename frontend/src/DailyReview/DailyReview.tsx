@@ -105,7 +105,7 @@ const DailyReview = () => {
       <header className="daily-review-header">
         <div>
           <p className="daily-review-eyebrow">Restaurant operations</p>
-          <h1>Daily Review</h1>
+          <h1>Daily Review (Demo)</h1>
           <p>Review sales, collected payments, refunds, and order variances.</p>
         </div>
         <div className="daily-review-filters">
@@ -144,6 +144,10 @@ const DailyReview = () => {
           </label>
         </div>
       </header>
+      <aside className="daily-review-demo-notice" aria-label="Demo data">
+        <strong>Demo data</strong>
+        <p>This view uses synthetic transaction data for development. Real day-level analysis will be enabled once transaction-level Square data is connected.</p>
+      </aside>
 
       {isLoadingLocations && <p role="status">Loading locations...</p>}
       {isLoadingReview && <p role="status">Calculating daily review...</p>}
