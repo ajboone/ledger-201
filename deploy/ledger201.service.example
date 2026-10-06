@@ -1,0 +1,28 @@
+[Unit]
+Description=Ledger 201 FastAPI
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=ledger
+Group=ledger
+WorkingDirectory=/opt/ledger201/backend
+EnvironmentFile=/etc/ledger201/ledger201.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ledger201/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ledger201
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

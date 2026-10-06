@@ -12,3 +12,5 @@ The application consists of:
 
 More detailed setup and run instructions are available in the `frontend` and
 `backend` README files.
+
+For the first Ubuntu EC2 deployment, follow [the deployment guide](deploy/README.md).

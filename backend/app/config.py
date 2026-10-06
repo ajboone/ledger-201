@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from dotenv import load_dotenv
 
@@ -16,3 +17,8 @@ def load_environment(env_file: Path | None = None) -> None:
 
 
 load_environment()
+
+
+def get_database_url() -> str:
+    """Use process/.env configuration, retaining the local SQLite default."""
+    return os.environ.get("DATABASE_URL", "sqlite:///./ledger201.db")

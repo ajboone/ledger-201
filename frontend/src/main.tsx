@@ -19,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="vendor" element={<Vendor />} />
+          <Route path="vendors" element={<Vendor />} />
           <Route path="location" element={<Location />} />
           <Route path="daily-review" element={<DailyReview />} />
           <Route path="square-reports" element={<SquareReports />} />

@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { apiUrl } from "./url";
 
 export async function apiRequest<T>(
   path: string,
@@ -9,7 +8,9 @@ export async function apiRequest<T>(
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(apiUrl(
+    path, import.meta.env?.VITE_API_BASE_URL, import.meta.env?.PROD ?? false,
+  ), {
     ...options,
     headers,
   });

@@ -56,3 +56,9 @@ def read_home() -> dict[str, str]:
     """Confirm that the Ledger 201 API is running."""
 
     return {"message": "Ledger 201 is running."}
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Lightweight liveness check; no database or provider calls."""
+    return {"status": "ok"}
