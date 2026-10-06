@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from datetime import date, datetime
 from types import SimpleNamespace
 
@@ -1036,3 +1037,183 @@ def test_provider_failure_does_not_expose_provider_details(
         _run(db_session, client, location_id)
 
     assert "sensitive provider response details" not in str(captured.value)
+
+
+def test_broad_analysis_delivers_complementary_metrics_across_tool_rounds(
+    db_session: Session,
+) -> None:
+    """Verify real tool payloads and policy delivery, not a fake model's reasoning."""
+    location_id = _seed_ai_data(db_session)
+    report = _seed_monthly_report(db_session, location_id)
+    report.item_sales.extend([
+        models.SquareItemSales(item_name="Steak", quantity=2, sales_amount=2000),
+        models.SquareItemSales(item_name="Soda", quantity=20, sales_amount=1000),
+    ])
+    report.discount_summaries.extend([
+        models.SquareDiscountSummary(discount_name="Military", usage_count=3, amount=-190),
+        models.SquareDiscountSummary(discount_name="Other", usage_count=1, amount=-10),
+    ])
+    report.category_sales.extend([
+        models.SquareCategorySales(category_name="Kitchen Print", quantity=2, sales_amount=2000),
+        models.SquareCategorySales(category_name="Sushi Print", quantity=12, sales_amount=6000),
+        models.SquareCategorySales(category_name="Both Printers", quantity=1, sales_amount=2000),
+    ])
+    db_session.commit()
+    first_tools = [
+        ("get_monthly_report_summary", {}),
+        ("get_monthly_top_items_by_revenue", {"limit": 3}),
+        ("get_monthly_top_items_by_quantity", {"limit": 3}),
+    ]
+    next_tools = [
+        ("get_monthly_item_sales_metrics", {}),
+        ("get_monthly_sales_concentration", {"top_n": 5}),
+        ("get_monthly_sales_concentration", {"top_n": 10}),
+        ("get_monthly_discount_summary", {}),
+        ("get_monthly_routing_mix", {}),
+    ]
+
+    def calls(specs, prefix):
+        return _response([
+            _function_call(name, json.dumps({"year": 2026, "month": 9, **args}), f"{prefix}-{index}")
+            for index, (name, args) in enumerate(specs)
+        ])
+
+    client, responses = _fake_client(
+        calls(first_tools, "initial"), calls(next_tools, "followup"),
+        _response([SimpleNamespace(type="message")], "Supported synthesis."),
+    )
+    history = [schemas.AIAnalystConversationMessage(
+        role="user", content="Analyze September 2026.",
+    ), schemas.AIAnalystConversationMessage(
+        role="assistant", content="Item-detail rows do not fully reconcile to the report's Items total.",
+    )]
+    result = _run(db_session, client, location_id, "What stands out?", history)
+    assert len(responses.calls) == 3
+    assert [call.tool for call in result.tool_calls_used] == [
+        name for name, _ in first_tools + next_tools
+    ]
+    payloads = {
+        row["call_id"]: json.loads(row["output"])
+        for row in responses.calls[-1]["input"]
+        if isinstance(row, dict) and row.get("type") == "function_call_output"
+    }
+    revenue, quantity = payloads["initial-1"], payloads["initial-2"]
+    assert [row["item_name"] for row in revenue] == ["Salmon Roll", "Steak", "Soda"]
+    assert [row["item_name"] for row in quantity] == ["Soda", "Salmon Roll", "Steak"]
+    assert Decimal(revenue[1]["reported_revenue_per_unit"]) == Decimal("1000")
+    assert Decimal(quantity[0]["reported_revenue_per_unit"]) == Decimal("50")
+    assert payloads["followup-0"]["revenue_per_unit_unit"] == "minor currency units per reported unit"
+    for call_id in ("followup-1", "followup-2"):
+        assert Decimal(payloads[call_id]["revenue_share_percent"]) == Decimal("94.74")
+        assert payloads[call_id]["total_item_sales"] == 9500
+        assert payloads[call_id]["data_quality_notes"]
+    discounts = payloads["followup-3"]
+    assert discounts["total_discount_amount"] == -200
+    military = next(row for row in discounts["discounts"] if row["discount_name"] == "Military")
+    assert abs(military["amount"]) * 100 / abs(discounts["total_discount_amount"]) == 95
+    routing = payloads["followup-4"]
+    assert routing["total_routing_sales"] == 10000
+    assert {row["category_name"]: Decimal(row["revenue_share_percent"])
+            for row in routing["categories"]} == {
+        "Kitchen Print": Decimal("20"), "Sushi Print": Decimal("60"),
+        "Both Printers": Decimal("20"),
+    }
+    for request in responses.calls:
+        policy = request["instructions"]
+        assert "synthesize rather than recap" in policy
+        assert "Do not call every tool blindly" in policy
+        assert "do not repeat the full paragraph" in policy
+        assert request["input"][2]["content"] == history[1].content
+
+
+@pytest.mark.parametrize("question,policy_fragments", [
+    ("What is interesting from this data?", ["2-4 strongest supported relationships", "top-5 and/or top-10 concentration"]),
+    ("What is interesting about the top items?", ["Compare revenue rank versus quantity rank", "Never label\nreported sales per unit as price, profit, margin, contribution, or markup"]),
+    ("What should Jacob pay attention to?", ["Separate observation from an actionable next question", "Do not recommend changing\nmenu placement"]),
+    ("Which item is most profitable?", ["Without cost data, food cost, margin, and profitability cannot be determined"]),
+    ("Is kitchen doing better than sushi?", ["Higher\nrouting sales do not establish better profitability or busier staff", "Keep both-printer routing separate"]),
+    ("What about discounts?", ["100 * abs(program amount) / abs(total discount", "consistent discount sign convention", "abuse, waste, fraud, or poor"]),
+    ("Tell me more about those items.", ["one compact reminder suffices", "Only use that caveat when supported by tool results"]),
+])
+def test_synthesis_policy_is_sent_to_provider(db_session, question, policy_fragments):
+    """Policy regression checks; actual language quality needs live smoke review."""
+    location_id = _seed_ai_data(db_session)
+    client, responses = _fake_client(_response([SimpleNamespace(type="message")], "Response."))
+    _run(db_session, client, location_id, question)
+    for fragment in policy_fragments:
+        assert fragment in responses.calls[0]["instructions"]
+
+
+def test_narrow_monthly_fact_does_not_force_broad_tool_fanout(db_session):
+    location_id = _seed_ai_data(db_session)
+    _seed_monthly_report(db_session, location_id)
+    client, responses = _fake_client(
+        _response([_function_call("get_monthly_report_summary", '{"year":2026,"month":9}', "net")]),
+        _response([SimpleNamespace(type="message")], "September 2026 net sales were $97.00."),
+    )
+    result = _run(db_session, client, location_id, "What were net sales in September 2026?")
+    assert [call.tool for call in result.tool_calls_used] == ["get_monthly_report_summary"]
+    assert len(responses.calls) == 2
+    assert json.loads(responses.calls[1]["input"][-1]["output"])["net_sales_amount"] == 9700
+    assert "For narrow factual questions, answer narrowly" in responses.calls[0]["instructions"]
+
+
+@pytest.mark.parametrize("question,required_guidance", [
+    ("Does the routing mix suggest staffing problems?", [
+        "say the current report cannot establish that",
+        "Do not suggest understaffing or labor imbalance",
+        "labor utilization, staffing adequacy, workload, throughput, bottlenecks, efficiency, or profitability",
+    ]),
+    ("Could Ledger evaluate staffing?", [
+        "Staffing, labor, and order data would allow Ledger to evaluate",
+        "sales shares alone are not a measure of that demand",
+    ]),
+    ("Are the popular items profitable?", [
+        "Item-cost data would let Ledger compare popularity with profitability",
+        "Cost data is required to evaluate margin, profit, contribution margin, or food-cost efficiency",
+        "high-revenue items are not necessarily high-profit items",
+    ]),
+    ("Anything else interesting about September?", [
+        "CURRENT OBSERVATION -> WHAT ADDITIONAL DATA WOULD ENABLE -> POSSIBLE QUESTION TO TEST",
+        "Useful next data layers are welcome when relevant",
+        "Do not imply a hidden problem or suspected cause unless supported by evidence",
+        "The next useful layer would be...",
+    ]),
+])
+def test_future_analysis_guidance_survives_routing_tool_round(
+    db_session: Session, question: str, required_guidance: list[str],
+) -> None:
+    """Check policy delivery around real tool execution, not mocked prose quality."""
+    location_id = _seed_ai_data(db_session)
+    report = _seed_monthly_report(db_session, location_id)
+    report.category_sales.extend([
+        models.SquareCategorySales(category_name="Kitchen Print", quantity=3, sales_amount=6000),
+        models.SquareCategorySales(category_name="Sushi Print", quantity=9, sales_amount=4000),
+    ])
+    db_session.commit()
+    client, responses = _fake_client(
+        _response([_function_call(
+            "get_monthly_routing_mix", '{"year":2026,"month":9}', "routing",
+        )]),
+        _response([SimpleNamespace(type="message")], "Mock completion."),
+    )
+    _run(db_session, client, location_id, question, history=[
+        schemas.AIAnalystConversationMessage(role="user", content="Use September 2026."),
+    ])
+    assert len(responses.calls) == 2
+    routing = json.loads(responses.calls[1]["input"][-1]["output"])
+    assert routing["total_routing_sales"] == 10000
+    assert {row["category_name"]: Decimal(row["revenue_share_percent"])
+            for row in routing["categories"]} == {
+        "Kitchen Print": Decimal("60"), "Sushi Print": Decimal("40"),
+    }
+    for request in responses.calls:
+        policy = " ".join(request["instructions"].split())
+        for guidance in required_guidance:
+            assert guidance in policy
+        # Keep the existing synthesis and safety guidance alongside the refinement.
+        assert "Compare revenue rank versus quantity rank" in policy
+        assert "top-5 and/or top-10 concentration" in policy
+        assert "Do not call every tool blindly" in policy
+        assert "Never use synthetic or demo daily transaction data" in policy
+        assert "one compact reminder suffices" in policy
